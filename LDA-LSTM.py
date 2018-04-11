@@ -19,20 +19,18 @@ def modify_path(path):
 
 
 class LDA:
-	def __init__(self, model_path = "model/", corpus_path="corpus/avaliable", topic_num=100, model_time=None):
-		self.model_time = str(int(time.time())) if model_time == None else model_time
-		self.model_path = modify_path(model_path)
-		self.model_save_path = self.model_path + modify_path(self.model_time)
+	def __init__(self, model_path = "model/LDA/", corpus_path="corpus/avaliable", topic_num=100, model_time=None):
+		self.model_save_path = modify_path(self.get_model_save_path(topic_num))
 		self.corpus_path = modify_path(corpus_path)
 		self.load_stopwords()
 		self.useless_files = set([".DS_Store"])
 		self.topic_num = topic_num
 
-		self.english_model_path = self.model_save_path + "english_topic_{topic_num}.model".format(topic_num = self.topic_num)
-		self.chinese_model_path = self.model_save_path + "chinese_topic_{topic_num}.model".format(topic_num = self.topic_num)
+		self.english_model_path = self.model_save_path + "english.model"
+		self.chinese_model_path = self.model_save_path + "chinese.model"
 
 		try:
-			os.mkdir("model/"+self.model_time)
+			os.mkdir(self.model_save_path)
 		except:
 			pass
 
@@ -43,6 +41,9 @@ class LDA:
 		formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 		handler.setFormatter(formatter)
 		self.logger.addHandler(handler)
+
+	def get_model_save_path(self, topic_num):
+		return "model/LDA/" + "topic_num({topic_num})/".format(topic_num = topic_num)
 
 	def load_stopwords(self):
 		with open("stopwords.txt", encoding="utf-8") as fd:
@@ -62,8 +63,12 @@ class LDA:
 				txt = fd.read()
 				docs = txt.split("\n\n")[:-1]
 				corpus += map(lambda x:x.split("\n"), docs)
+		
+		english, chinese = zip(*corpus)
+		english = [sentence.strip() for sentence in english]
+		chinese = [sentence.strip() for sentence in chinese]
 
-		return zip(*corpus)
+		return english, chinese
 
 	def load_model(self):
 		self.english_model = LdaModel.load(self.english_model_path)
@@ -74,22 +79,19 @@ class LDA:
 
 	def prepare_train(self):
 		self.logger.info("loading corpus...")
-		corpus = list(self.load_corpus())
-
-		english = corpus[0]
-		chinese = corpus[1]
-
-		thu = thulac.thulac(seg_only=True)
+		english, chinese = list(self.load_corpus())
 
 		self.logger.info("cutting english sentences...")
-		english = map(self.split, english)
+		cut_result = []
+		for sentence in english:
+			cut_result.append([word for word in sentence.split() if word not in self.stopwords])
+		english = cut_result
 
 		self.logger.info("cutting chinese sentences...")
-		chinese_cut = map(thu.cut, chinese)
-		chinese = []
-		for i,item in enumerate(chinese_cut):
-			chinese.append(list(map(lambda x:x[0], item)))
-		chinese = [[word for word in sent if word not in self.stopwords] for sent in chinese]
+		cut_result = []
+		for i, sentence in enumerate(chinese):
+			cut_result.append(sentence.split(" "))
+		chinese = cut_result
 
 		self.logger.info("making dictionaries...")
 		self.english_dictionary = Dictionary(english)
@@ -235,29 +237,46 @@ class LDA_LSTM:
 
 		return english_batch, chinese_batch
 
-	def gen_batch(self):
-		files = list(map(lambda x:self.corpus_path+x, os.listdir(self.corpus_path)))
+	def gen_batch(self, pos_proportion=0.5):
+		pos_file = self.corpus_path+"pos.txt"
+		neg_file = self.corpus_path+"neg.txt"
+
+		pos_num = int(self.batch_size * pos_proportion)
+		neg_num = self.batch_size - pos_num
 
 		batch_num = 0
 		english_batch = []
 		chinese_batch = []
-		for _file in files:
-			with open(_file, encoding="utf-8", errors="ignore") as fd:
+		score_list = []
+
+		with open(pos_file, encoding="utf-8", errors="ignore") as pos_fd:
+			with open(neg_file, encoding="utf-8", errors="ignore") as neg_fd:
 				while True:
-					batch_num += 1
+					for _ in range(pos_num):
+						english = pos_fd.readline().strip()
+						chinese = pos_fd.readline().strip()
+						pos_fd.readline()
+						if len(english) == 0 or len(chinese) == 0:
+							break
 
-					english = fd.readline().strip()
-					chinese = fd.readline().strip()
-					fd.readline()
-					if len(english) == 0 or len(chinese) == 0:
-						break
+						english_batch.append(english)
+						chinese_batch.append(chinese)
+						score_list.append(1)
 
-					english_batch.append(english)
-					chinese_batch.append(chinese)
+					for _ in range(neg_num):
+						english = neg_fd.readline().strip()
+						chinese = neg_fd.readline().strip()
+						neg_fd.readline()
+						if len(english) == 0 or len(chinese) == 0:
+							break
+
+						english_batch.append(english)
+						chinese_batch.append(chinese)
+						score_list.append(0)
 
 					# saving model
 					if batch_num % self.batch_size == 0:
-						yield self.txt_2_fea(english_batch, chinese_batch)
+						yield self.txt_2_fea(english_batch, chinese_batch), np.arrary(score_list, dtype=np.float32)
 						english_batch = []
 						chinese_batch = []
 						batch_num = 0
@@ -279,14 +298,26 @@ class LDA_LSTM:
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='bieshe artwork.')
 	parser.add_argument('--mode', default="lda", help='train lda model')
+	parser.add_argument('--topic_num', default=None, help='lda topic num')
 	args = parser.parse_args()
 	if args.mode == "train_lda":
 		lda = LDA(model_time="1515053496")
 		lda.prepare_train()
-		for topic_num in range(10, 100):
-			lda.train(topic_num = topic_num)
+		if args.topic_num is not None:
+			lda.train(topic_num = int(args.topic_num))
+		else:
+			for topic_num in range(10, 100):
+				lda.train(topic_num = topic_num)
 	elif args.mode == "train_lstm":
 		lda_lstm = LDA_LSTM()
 		lda_lstm.train()
 		# for batch in lda_lstm.gen_batch():
 		# 	print(batch)
+	elif args.mode == "test":
+		lda_lstm = LDA_LSTM()
+		num = 0
+		for batch in lda_lstm.gen_batch():
+			print(batch)
+			num += 1
+			if num >= 1:
+				break
