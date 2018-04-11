@@ -1,4 +1,5 @@
 import time
+import shutil
 import logging
 import argparse
 import numpy as np
@@ -7,7 +8,6 @@ from gensim.corpora import Dictionary
 import os, thulac, time
 import tensorflow as tf
 from tensorflow.contrib.rnn import BasicLSTMCell
-from tensorflow.contrib.layers import fully_connected
 from tensorflow.contrib.seq2seq import sequence_loss
 
 
@@ -20,14 +20,14 @@ def modify_path(path):
 
 class LDA:
 	def __init__(self, model_path = "model/LDA/", corpus_path="corpus/avaliable", topic_num=100, model_time=None):
-		self.model_save_path = modify_path(self.get_model_save_path(topic_num))
+		self.model_save_path = self.get_model_save_path(topic_num)
 		self.corpus_path = modify_path(corpus_path)
 		self.load_stopwords()
 		self.useless_files = set([".DS_Store"])
 		self.topic_num = topic_num
 
-		self.english_model_path = self.model_save_path + "english.model"
-		self.chinese_model_path = self.model_save_path + "chinese.model"
+		self.english_model_path = self.model_save_path + "english_topic_{topic_num}.model".format(topic_num = self.topic_num)
+		self.chinese_model_path = self.model_save_path + "chinese_topic_{topic_num}.model".format(topic_num = self.topic_num)
 
 		try:
 			os.mkdir(self.model_save_path)
@@ -43,7 +43,8 @@ class LDA:
 		self.logger.addHandler(handler)
 
 	def get_model_save_path(self, topic_num):
-		return "model/LDA/" + "topic_num({topic_num})/".format(topic_num = topic_num)
+		path = "model/LDA/" + "topic_num({topic_num})/".format(topic_num = topic_num)
+		return modify_path(path)
 
 	def load_stopwords(self):
 		with open("stopwords.txt", encoding="utf-8") as fd:
@@ -84,7 +85,7 @@ class LDA:
 		self.logger.info("cutting english sentences...")
 		cut_result = []
 		for sentence in english:
-			cut_result.append([word for word in sentence.split() if word not in self.stopwords])
+			cut_result.append([word for word in sentence.split()])
 		english = cut_result
 
 		self.logger.info("cutting chinese sentences...")
@@ -104,8 +105,12 @@ class LDA:
 	def train(self, topic_num=None):
 		self.topic_num = self.topic_num if topic_num is None else topic_num
 
-		self.english_model_path = self.model_save_path + "english_topic_{topic_num}.model".format(topic_num = self.topic_num)
-		self.chinese_model_path = self.model_save_path + "chinese_topic_{topic_num}.model".format(topic_num = self.topic_num)
+		model_path = self.get_model_save_path(topic_num)
+		if not os.path.exists(model_path):
+			os.mkdir(model_path)
+
+		self.english_model_path = model_path + "english_topic_{topic_num}.model".format(topic_num = self.topic_num)
+		self.chinese_model_path = model_path + "chinese_topic_{topic_num}.model".format(topic_num = self.topic_num)
 
 		self.logger.info("training english model....,topic num: %3d" % (topic_num))
 		self.english_model = LdaModel(corpus=self.english_ids, id2word=self.english_dictionary, num_topics=topic_num)
@@ -127,7 +132,7 @@ class LDA:
 
 
 class LDA_LSTM:
-	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable"):
+	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=True):
 		self.batch_size = batch_size
 		self.topic_num = topic_num
 		self.hidden_size = hidden_size
@@ -135,8 +140,18 @@ class LDA_LSTM:
 		self.save_step = 30
 		self.thu = thulac.thulac(seg_only=True)
 		self.model_path = "./model/LSTM/topic_num(%d)-hidden_size(%d)-batch_size(%d)/" % (self.topic_num, self.hidden_size, self.batch_size)
-		if not os.path.exists(self.model_path):
-			os.mkdir(self.model_path)
+		self.model_save_path = self.model_path + "model/"
+		self.summary_save_path = self.model_path + "summary/"
+
+		if debug == True:
+			if os.path.exists(self.model_path):
+				shutil.rmtree(self.model_path)
+
+		# creat directory
+		for _dir in [self.model_path, self.model_save_path, self.summary_save_path]:
+			if not os.path.exists(_dir):
+				os.mkdir(_dir)
+
 		self.load_stopwords()
 
 		self.load_lda()
@@ -158,7 +173,7 @@ class LDA_LSTM:
 				else:
 					X = chinese_input
 
-				cell = BasicLSTMCell(num_units=self.hidden_size, name="basic-lstm-cell")
+				cell = BasicLSTMCell(num_units=self.hidden_size)
 				initial_state = cell.zero_state(self.batch_size, tf.float32)
 				outputs, _states = tf.nn.dynamic_rnn(cell,
 				                                     X,
@@ -168,12 +183,14 @@ class LDA_LSTM:
 				outputs = tf.slice(outputs, [0,self.topic_num-1,0], [self.batch_size, 1, self.hidden_size])
 				two_lstm_outputs.append(tf.reshape(outputs, [-1, self.hidden_size]))
 
+		# concat and reshape output
 		concat_outputs = tf.concat(two_lstm_outputs, 1)
+		concat_outputs = tf.reshape(concat_outputs, [-1, 2*self.hidden_size])
 
-		y = fully_connected(inputs=concat_outputs,
-				                          num_outputs=1,
-				                          activation_fn=None)
-		y = tf.reshape(y, [self.batch_size])
+		# full connected layer
+		w = tf.Variable(tf.random_normal([2*self.hidden_size, 1]), name="weight", dtype=tf.float32)
+		b = tf.Variable(tf.constant(1.0), name="bias", dtype=tf.float32)
+		y = tf.matmul(concat_outputs, w) + b
 		y = tf.nn.sigmoid(y)
 
 		self.global_step = tf.Variable(0, trainable=False)  
@@ -181,7 +198,13 @@ class LDA_LSTM:
 		self.loss_op = tf.reduce_mean(tf.square(y - Y))
 		self.train_op = tf.train.AdamOptimizer(learning_rate=0.1).minimize(self.loss_op, global_step=self.global_step)
 
+		tf.summary.scalar("loss", self.loss_op)
+
 		self.prediction = y
+
+		# 导出图
+		# print("exporting meta graph......")
+		# tf.train.export_meta_graph(filename=self.model_path+"model.ckpt.meta") 
 
 	def load_stopwords(self):
 		with open("stopwords.txt", encoding="utf-8") as fd:
@@ -195,13 +218,18 @@ class LDA_LSTM:
 		init = tf.initialize_all_variables()
 		with tf.Session() as sess:
 			sess.run(init)
-			for english_batch, chinese_batch in self.gen_batch():
-				feed_dict = self.gen_feed_dict(english_batch, chinese_batch, np.ones(shape=(self.batch_size,)))
-				loss, _, prediction, global_step = sess.run([self.loss_op, self.train_op, self.prediction, self.global_step], feed_dict=feed_dict)
-				print(prediction)
+			merged = tf.summary.merge_all()
+			file_writer = tf.summary.FileWriter(self.summary_save_path, sess.graph)
+			for (english_batch, chinese_batch), labels in self.gen_batch():
+				feed_dict = self.gen_feed_dict(english_batch, chinese_batch, labels)
+				loss, _, summary, prediction, global_step = sess.run([self.loss_op, self.train_op, merged, self.prediction, self.global_step], feed_dict=feed_dict)
+				step = global_step % self.save_step
+				print("current_step/save_step: (%4d)/(%4d)" % (self.save_step if step == 0 else step, self.save_step))
 				if global_step % self.save_step == 0:
 					print("saving model....")
-					self.saver.save(sess, self.model_path+"model.ckpt")
+					self.saver.save(sess, self.model_save_path+"model.ckpt")
+				# write summary
+				file_writer.add_summary(summary, global_step)
 
 	def txt_2_fea(self, english_batch, chinese_batch):
 		english_batch = [english.split() for english in english_batch]
@@ -276,7 +304,7 @@ class LDA_LSTM:
 
 					# saving model
 					if batch_num % self.batch_size == 0:
-						yield self.txt_2_fea(english_batch, chinese_batch), np.arrary(score_list, dtype=np.float32)
+						yield self.txt_2_fea(english_batch, chinese_batch), np.array(score_list, dtype=np.float32)
 						english_batch = []
 						chinese_batch = []
 						batch_num = 0
@@ -297,8 +325,10 @@ class LDA_LSTM:
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='bieshe artwork.')
-	parser.add_argument('--mode', default="lda", help='train lda model')
-	parser.add_argument('--topic_num', default=None, help='lda topic num')
+	parser.add_argument('--mode', type=str, default="lda", help='train lda model')
+	parser.add_argument('--topic_num', type=int, default=100, help='lda topic num')
+	parser.add_argument('--batch_size', type=int, default=50, help='batch size')
+	parser.add_argument('--debug', type=bool, default=False, help='debug mode')
 	args = parser.parse_args()
 	if args.mode == "train_lda":
 		lda = LDA(model_time="1515053496")
@@ -309,7 +339,7 @@ if __name__ == "__main__":
 			for topic_num in range(10, 100):
 				lda.train(topic_num = topic_num)
 	elif args.mode == "train_lstm":
-		lda_lstm = LDA_LSTM()
+		lda_lstm = LDA_LSTM(batch_size=args.batch_size, topic_num=args.topic_num, debug=args.debug)
 		lda_lstm.train()
 		# for batch in lda_lstm.gen_batch():
 		# 	print(batch)
