@@ -317,10 +317,10 @@ class LDA_LSTM:
 		self.chinese_lda = lda.chinese_model
 		scores = 1
 
-	def predict_raw(self, english_batch, chinese_batch):
+	def predict_raw(self, english_raw, chinese_raw):
 		english_batch, chinese_batch = self.txt_2_fea(english_batch, chinese_batch)
 		with tf.Session() as sess:
-			sess.run([self.predict], feed_dict={"english_input:0": english_batch, "chinese_input0": chinese_batch})
+			predict = sess.run([self.predict], feed_dict={"english_input:0": english_batch, "chinese_input0": chinese_batch})
 
 
 if __name__ == "__main__":

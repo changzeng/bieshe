@@ -2,16 +2,24 @@
 
 import os
 import thulac
+import argparse
 from random import randint
 from sys import getsizeof
 
 
 class Generator(object):
     def __init__(self):
-        self.en_not_cut = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en"
-        self.zh_not_cut = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.zh"
-        self.en = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en.cut"
-        self.zh = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.zh.cut"
+        # training dataset
+        self.en_train_not_cut = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en"
+        self.zh_train_not_cut = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.zh"
+        self.en_train = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en.cut"
+        self.zh_train = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.zh.cut"
+        # test dataset
+        self.en_test_not_cut = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en.test"
+        self.zh_test_not_cut = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.zh.test"
+        self.en_test = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en.test.cut"
+        self.zh_test = "corpus/raw/chinese_and_english/news-commentary-v12.zh-en.zh.test.cut"
+        # key parameters
         self.max_corpus_size = 50 * 1024 * 1024
         self.neg_num = 10
         self.min_line_num = 10
@@ -19,11 +27,9 @@ class Generator(object):
         self.line_step = 2
 
         self.load_stopwords()
-        self.cut()
-        self.load_file()
 
-    def cut(self):
-        if os.path.exists(self.en) and os.path.exists(self.zh):
+    def cut(self, en_file, zh_file):
+        if os.path.exists(en_file+".cut") and os.path.exists(zh_file+".cut"):
             return
         # 此处应添加删除多余文件代码
         # ---------------------
@@ -87,8 +93,8 @@ class Generator(object):
         def split_zh(_str):
             return [cut_item[0] for cut_item in thu.cut(_str)]
 
-        cut_raw(self.en_not_cut, split_en)
-        cut_raw(self.zh_not_cut, split_zh)
+        cut_raw(en_file, split_en)
+        cut_raw(zh_file, split_zh)
 
     def load_stopwords(self):
         with open("stopwords.txt", encoding="utf-8") as fd:
@@ -103,16 +109,14 @@ class Generator(object):
             txt = fd.read()
             self.stopwords_punctuation = set(txt.split("\n"))
 
-    def load_file(self):
-        files = [self.en, self.zh]
-        for _file in files:
-            with open(_file, encoding="utf-8", errors="ignore") as fd:
+    def load_file(self, en_file, zh_file):
+        def load(file_name):
+            with open(file_name, encoding="utf-8", errors="ignore") as fd:
                 lines = fd.read().strip().split("\n")
                 lines = [line.strip() for line in lines]
-                if "zh.cut" == _file[-6:]:
-                    self.zh_lines = lines
-                elif "en.cut" == _file[-6:]:
-                    self.en_lines = lines
+                return lines
+        self.en_lines = load(en_file)
+        self.zh_lines = load(zh_file)
 
     def random(self, _range, _num, block_list=set()):
         num_set = set()
@@ -149,8 +153,8 @@ class Generator(object):
                 zh_lines = self.fetch(self.zh_lines, _range)
                 yield self.make_str(en_lines, zh_lines)
 
-    def continue_pos_samples(self, num=100):
-        self.father_func(self.continue_pos_samples_func, num=num, file_name="corpus/avaliable/pos.txt")
+    def continue_pos_samples(self, num=100, file_name="pos.txt"):
+        self.father_func(self.continue_pos_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
 
     def discrete_pos_samples_func(self):
         for line_num in range(self.min_line_num, self.max_line_num):
@@ -161,8 +165,8 @@ class Generator(object):
                 zh_lines = self.fetch(self.zh_lines, rand_line_list)
                 yield self.make_str(en_lines, zh_lines)
 
-    def discrete_pos_samples(self, num=100):
-        self.father_func(self.discrete_pos_samples_func, num=num, file_name="corpus/avaliable/pos.txt")
+    def discrete_pos_samples(self, num=100, file_name="pos.txt"):
+        self.father_func(self.discrete_pos_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
 
     def continue_neg_samples_func(self):
         for line_num in range(self.min_line_num, self.max_line_num):
@@ -175,8 +179,8 @@ class Generator(object):
                     zh_lines = self.fetch(self.zh_lines, line_num_list)
                     yield self.make_str(en_lines, zh_lines)
 
-    def continue_neg_samples(self, num=100):
-        self.father_func(self.continue_neg_samples_func, num=num, file_name="corpus/avaliable/neg.txt")
+    def continue_neg_samples(self, num=100, file_name="neg.txt"):
+        self.father_func(self.continue_neg_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
 
     def discrete_neg_samples_func(self):
         for line_num in range(self.min_line_num, self.max_line_num):
@@ -189,8 +193,8 @@ class Generator(object):
                 yield self.make_str(en_lines, zh_lines)
 
 
-    def discrete_neg_samples(self, num=100):
-        self.father_func(self.discrete_neg_samples_func, num=num, file_name="corpus/avaliable/neg.txt")
+    def discrete_neg_samples(self, num=100, file_name="neg.txt"):
+        self.father_func(self.discrete_neg_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
         
     def father_func(self, func, args=None, num=100, file_name="output.txt"):
         corpus = []
@@ -209,10 +213,31 @@ class Generator(object):
         if len(corpus) != 0:
             self.write_corpus_to_file(corpus, file_name)
 
+    def gen_train_dataset(self, gen_num):
+        print("generating training dataset...")
+        self.cut(self.en_train_not_cut, self.zh_train_not_cut)
+        self.load_file(self.en_train, self.zh_train)
+        self.continue_pos_samples(gen_num)
+        self.discrete_pos_samples(gen_num)
+        self.continue_neg_samples(gen_num)
+        self.discrete_neg_samples(gen_num)
+
+    def gen_test_dataset(self, gen_num):
+        print("generating test dataset...")
+        self.cut(self.en_test_not_cut, self.zh_test_not_cut)
+        self.load_file(self.en_test, self.zh_test)
+        self.continue_pos_samples(gen_num, file_name="pos_test.txt")
+        self.discrete_pos_samples(gen_num, file_name="pos_test.txt")
+        self.continue_neg_samples(gen_num, file_name="neg_test.txt")
+        self.discrete_neg_samples(gen_num, file_name="neg_test.txt")
+
 if __name__ == "__main__":
-    gen_num = 2 * 10000
+    parser = argparse.ArgumentParser(description='corpus generation.')
+    parser.add_argument('--mode', type=str, default="train", help="generating mode")
+    args = parser.parse_args()
+
     generator = Generator()
-    generator.continue_pos_samples(gen_num)
-    generator.discrete_pos_samples(gen_num)
-    generator.continue_neg_samples(gen_num)
-    generator.discrete_neg_samples(gen_num)
+    if args.mode == "train":
+        generator.gen_train_dataset(2 * 10000)
+    elif args.mode == "test":
+        generator.gen_test_dataset(3000)
