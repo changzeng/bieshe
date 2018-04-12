@@ -9,6 +9,7 @@ import os, thulac, time
 import tensorflow as tf
 from tensorflow.contrib.rnn import BasicLSTMCell
 from tensorflow.contrib.seq2seq import sequence_loss
+from buffer_writer import BufferWriter
 
 
 def modify_path(path):
@@ -132,7 +133,8 @@ class LDA:
 
 
 class LDA_LSTM:
-	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=True):
+	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=False, fea_dim=200):
+		self.fea_dim = fea_dim
 		self.batch_size = batch_size
 		self.topic_num = topic_num
 		self.hidden_size = hidden_size
@@ -202,6 +204,8 @@ class LDA_LSTM:
 
 		self.prediction = y
 
+		self.init = tf.initialize_all_variables()
+
 		# 导出图
 		# print("exporting meta graph......")
 		# tf.train.export_meta_graph(filename=self.model_path+"model.ckpt.meta") 
@@ -215,9 +219,8 @@ class LDA_LSTM:
 		return {"english_input:0": english_batch, "chinese_input:0": chinese_batch, "scores:0": scores}
 
 	def train(self):
-		init = tf.initialize_all_variables()
 		with tf.Session() as sess:
-			sess.run(init)
+			sess.run(self.init)
 			merged = tf.summary.merge_all()
 			file_writer = tf.summary.FileWriter(self.summary_save_path, sess.graph)
 			for (english_batch, chinese_batch), labels in self.gen_batch():
@@ -231,7 +234,7 @@ class LDA_LSTM:
 				# write summary
 				file_writer.add_summary(summary, global_step)
 
-	def txt_2_fea(self, english_batch, chinese_batch):
+	def txt_2_fea_soft_hot(self, english_batch, chinese_batch):
 		english_batch = [english.split() for english in english_batch]
 		chinese_batch = [chinese.split() for chinese in chinese_batch]
 		
@@ -265,7 +268,24 @@ class LDA_LSTM:
 
 		return english_batch, chinese_batch
 
-	def gen_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
+	def txt_2_fea_one_hot(self, english_batch, chinese_batch):
+		english_batch = [english.split() for english in english_batch]
+		chinese_batch = [chinese.split() for chinese in chinese_batch]
+		
+		english_bow_batch = [self.english_lda.id2word.doc2bow(english_words) for english_words in english_batch]
+		chinese_bow_batch = [self.chinese_lda.id2word.doc2bow(chinese_words) for chinese_words in chinese_batch]
+
+		english_topics_batch = [self.english_lda[english_bow] for english_bow in english_bow_batch]
+		chinese_topics_batch = [self.chinese_lda[chinese_bow] for chinese_bow in chinese_bow_batch]
+
+		english_batch = []
+		chinese_batch = []
+
+		for i in range(len(english_topics_batch)):
+			english_input = np.zeros(shape=(self.topic_num, self.topic_num), dtype=np.float32)
+			chinese_input = np.zeros(shape=(self.topic_num, self.topic_num), dtype=np.float32)
+
+	def gen_raw_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
 		if file_a == None or file_b == None:
 			pos_file = self.corpus_path+"pos.txt"
 			neg_file = self.corpus_path+"neg.txt"
@@ -289,7 +309,7 @@ class LDA_LSTM:
 						chinese = pos_fd.readline().strip()
 						pos_fd.readline()
 						if len(english) == 0 or len(chinese) == 0:
-							break
+							return
 
 						english_batch.append(english)
 						chinese_batch.append(chinese)
@@ -300,7 +320,7 @@ class LDA_LSTM:
 						chinese = neg_fd.readline().strip()
 						neg_fd.readline()
 						if len(english) == 0 or len(chinese) == 0:
-							break
+							return
 
 						english_batch.append(english)
 						chinese_batch.append(chinese)
@@ -308,10 +328,15 @@ class LDA_LSTM:
 
 					# saving model
 					if batch_num % self.batch_size == 0:
-						yield self.txt_2_fea(english_batch, chinese_batch), np.array(score_list, dtype=np.float32)
+						yield english_batch, chinese_batch, np.array(score_list, dtype=np.float32)
 						english_batch = []
 						chinese_batch = []
 						batch_num = 0
+
+	def gen_fea_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
+		for a, b, c in self.gen_raw_batch(pos_proportion=pos_proportion, file_a=file_a, file_b=file_b):
+			a_fea, b_fea = self.txt_2_fea_soft_hot(a, b)
+			yield a_fea, b_fea, c
 
 	def load_lda(self):
 		lda = LDA(topic_num=self.topic_num)
@@ -322,19 +347,37 @@ class LDA_LSTM:
 		scores = 1
 
 	def predict_raw(self, english_raw, chinese_raw):
-		english_batch, chinese_batch = self.txt_2_fea(english_raw, chinese_raw)
+		english_batch, chinese_batch = self.txt_2_fea_soft_hot(english_raw, chinese_raw)
 		with tf.Session() as sess:
-			predict = sess.run([self.predict], feed_dict={"english_input:0": english_batch, "chinese_input0": chinese_batch})
-		return predict
+			prediction = sess.run([self.prediction], feed_dict={"english_input:0": english_batch, "chinese_input:0": chinese_batch})
+		return prediction
 
-	def gen_test_batch(self):
-		return self.gen_batch(file_a="pos_test.txt", file_b="neg_test.txt")
+	def predict_batch(self, english_batch, chinese_batch):
+		with tf.Session() as sess:
+			prediction = sess.run([self.prediction], feed_dict={"english_input:0": english_batch, "chinese_input:0": chinese_batch})
+		return prediction
 
 	def test(self):
-		for (en_batch, zh_batch), labels in self.gen_test_batch():
-			predict = self.predict_raw(en_batch, zh_batch)
-			print(type(predict))
-			input()
+		max_buffer_size = 20 * 1024
+		en_writer = BufferWriter("result/en.txt", max_buffer_size=max_buffer_size)
+		zh_writer = BufferWriter("result/zh.txt", max_buffer_size=max_buffer_size)
+		labels_writer = BufferWriter("result/labels.txt", max_buffer_size=max_buffer_size)
+		predict_writer = BufferWriter("result/predict.txt", max_buffer_size=max_buffer_size)
+
+		with tf.Session() as sess:
+			saver = tf.train.Saver()
+			saver.restore(sess, self.model_path+"model/model.ckpt")
+			for en_batch, zh_batch, labels in self.gen_raw_batch(file_a="pos_test.txt", file_b="neg_test.txt"):
+				en_fea_batch, zh_fea_batch = self.txt_2_fea_soft_hot(en_batch, zh_batch)
+				prediction = sess.run([self.prediction], feed_dict={"english_input:0": en_fea_batch, "chinese_input:0": zh_fea_batch})
+				en_writer.update("\n".join(en_batch))
+				zh_writer.update("\n".join(zh_batch))
+				labels_writer.update("\n".join(map(str, labels)))
+				predict_writer.update("\n".join(map(str, prediction)))
+
+		# close buffer writter
+		for writer in [en_writer, zh_writer, labels_writer, predict_writer]:
+			writer.close()
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='bieshe artwork.')
@@ -345,7 +388,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 	
 	lda = LDA()
-	lda_lstm = LDA_LSTM(topic_num=int(args.topic_num), batch_size=args.batch_size)
+	lda_lstm = LDA_LSTM(topic_num=int(args.topic_num), batch_size=args.batch_size, debug=args.debug)
 	if args.mode == "train_lda":
 		lda.prepare_train()
 		if args.topic_num is not None:
@@ -355,5 +398,5 @@ if __name__ == "__main__":
 				lda.train(topic_num = topic_num)
 	elif args.mode == "train_lstm":
 		lda_lstm.train()
-	elif args.mode == "test":
+	elif args.mode == "test_lstm":
 		lda_lstm.test()

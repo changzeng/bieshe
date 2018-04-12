@@ -6,7 +6,7 @@
 class BufferWriter(object):
 	def __init__(self, file_name, max_buffer_size=30*1024*1024):
 		self.file_name = file_name
-		self.fd = open(self.file_name, "a+")
+		self.fd = open(self.file_name, "w+")
 		self.records = []
 		self.records_size = 0
 		self.max_buffer_size = max_buffer_size
@@ -21,8 +21,11 @@ class BufferWriter(object):
 			self.records_size = 0
 
 	def write_to_file(self):
+		print("writting to %s" % self.file_name)
 		self.fd.write("\n".join(self.records))
 		self.fd.write("\n")
 
 	def close(self):
+		if self.records_size > 0:
+			self.write_to_file()
 		self.fd.close()
