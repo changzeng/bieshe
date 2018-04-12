@@ -19,7 +19,7 @@ def modify_path(path):
 
 
 class LDA:
-	def __init__(self, model_path = "model/LDA/", corpus_path="corpus/avaliable", topic_num=100, model_time=None):
+	def __init__(self, model_path = "model/LDA/", corpus_path="corpus/avaliable", topic_num=100):
 		self.model_save_path = self.get_model_save_path(topic_num)
 		self.corpus_path = modify_path(corpus_path)
 		self.load_stopwords()
@@ -233,7 +233,7 @@ class LDA_LSTM:
 
 	def txt_2_fea(self, english_batch, chinese_batch):
 		english_batch = [english.split() for english in english_batch]
-		chinese_batch = [[word[0] for word in self.thu.cut(chinese) if word[0] not in self.stopwords] for chinese in chinese_batch]
+		chinese_batch = [chinese.split() for chinese in chinese_batch]
 		
 		english_bow_batch = [self.english_lda.id2word.doc2bow(english_words) for english_words in english_batch]
 		chinese_bow_batch = [self.chinese_lda.id2word.doc2bow(chinese_words) for chinese_words in chinese_batch]
@@ -265,9 +265,13 @@ class LDA_LSTM:
 
 		return english_batch, chinese_batch
 
-	def gen_batch(self, pos_proportion=0.5):
-		pos_file = self.corpus_path+"pos.txt"
-		neg_file = self.corpus_path+"neg.txt"
+	def gen_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
+		if file_a == None or file_b == None:
+			pos_file = self.corpus_path+"pos.txt"
+			neg_file = self.corpus_path+"neg.txt"
+		else:
+			pos_file = self.corpus_path+file_a
+			neg_file = self.corpus_path+file_b
 
 		pos_num = int(self.batch_size * pos_proportion)
 		neg_num = self.batch_size - pos_num
@@ -310,7 +314,7 @@ class LDA_LSTM:
 						batch_num = 0
 
 	def load_lda(self):
-		lda = LDA(model_time="1515053496", topic_num=self.topic_num)
+		lda = LDA(topic_num=self.topic_num)
 		lda.load_model()
 
 		self.english_lda = lda.english_model
@@ -318,10 +322,19 @@ class LDA_LSTM:
 		scores = 1
 
 	def predict_raw(self, english_raw, chinese_raw):
-		english_batch, chinese_batch = self.txt_2_fea(english_batch, chinese_batch)
+		english_batch, chinese_batch = self.txt_2_fea(english_raw, chinese_raw)
 		with tf.Session() as sess:
 			predict = sess.run([self.predict], feed_dict={"english_input:0": english_batch, "chinese_input0": chinese_batch})
+		return predict
 
+	def gen_test_batch(self):
+		return self.gen_batch(file_a="pos_test.txt", file_b="neg_test.txt")
+
+	def test(self):
+		for (en_batch, zh_batch), labels in self.gen_test_batch():
+			predict = self.predict_raw(en_batch, zh_batch)
+			print(type(predict))
+			input()
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='bieshe artwork.')
@@ -330,24 +343,17 @@ if __name__ == "__main__":
 	parser.add_argument('--batch_size', type=int, default=50, help='batch size')
 	parser.add_argument('--debug', type=bool, default=False, help='debug mode')
 	args = parser.parse_args()
+	
+	lda = LDA()
+	lda_lstm = LDA_LSTM(topic_num=int(args.topic_num), batch_size=args.batch_size)
 	if args.mode == "train_lda":
-		lda = LDA(model_time="1515053496")
 		lda.prepare_train()
 		if args.topic_num is not None:
-			lda.train(topic_num = int(args.topic_num))
+			lda.train(topic_num = args.topic_num)
 		else:
 			for topic_num in range(10, 100):
 				lda.train(topic_num = topic_num)
 	elif args.mode == "train_lstm":
-		lda_lstm = LDA_LSTM(batch_size=args.batch_size, topic_num=args.topic_num, debug=args.debug)
 		lda_lstm.train()
-		# for batch in lda_lstm.gen_batch():
-		# 	print(batch)
 	elif args.mode == "test":
-		lda_lstm = LDA_LSTM()
-		num = 0
-		for batch in lda_lstm.gen_batch():
-			print(batch)
-			num += 1
-			if num >= 1:
-				break
+		lda_lstm.test()
