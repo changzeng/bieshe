@@ -133,7 +133,7 @@ class LDA:
 
 
 class LDA_LSTM:
-	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=False, fea_dim=200):
+	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=False, fea_dim=20):
 		self.fea_dim = fea_dim
 		self.batch_size = batch_size
 		self.topic_num = topic_num
@@ -141,7 +141,7 @@ class LDA_LSTM:
 		self.corpus_path = modify_path(corpus_path)
 		self.save_step = 30
 		self.thu = thulac.thulac(seg_only=True)
-		self.model_path = "./model/LSTM/topic_num(%d)-hidden_size(%d)-batch_size(%d)/" % (self.topic_num, self.hidden_size, self.batch_size)
+		self.model_path = "./model/LSTM/topic_num(%d)-hidden_size(%d)-batch_size(%d)-fead_dim(%d)/" % (self.topic_num, self.hidden_size, self.batch_size, self.fea_dim)
 		self.model_save_path = self.model_path + "model/"
 		self.summary_save_path = self.model_path + "summary/"
 
@@ -161,19 +161,36 @@ class LDA_LSTM:
 		self.saver = tf.train.Saver() 
 
 	def build_graph(self):
-		english_input = tf.placeholder(tf.float32, [None, self.topic_num, self.topic_num], name="english_input")
-		chinese_input = tf.placeholder(tf.float32, [None, self.topic_num, self.topic_num], name="chinese_input")
+		english_input = tf.placeholder(tf.int32, [None, self.topic_num], name="english_input")
+		chinese_input = tf.placeholder(tf.int32, [None, self.topic_num], name="chinese_input")
 		
 		Y = tf.placeholder(tf.float32, [None], name="scores")
 
-		two_lstm_outputs = []
+		# embedding layer
+		with tf.variable_scope("embdding"):
+			en_embeddings = []
+			zh_embeddings = []
+			for i in range(self.topic_num):
+				english_ids = tf.slice(english_input, [0, i], [self.batch_size, 1])
+				chinese_ids = tf.slice(chinese_input, [0, i], [self.batch_size, 1])
+				embedding_en = tf.Variable(tf.random_normal([self.fea_dim, self.hidden_size]), name="en_topic_%d_embedding" % (i+1), dtype=tf.float32)
+				embedding_zh = tf.Variable(tf.random_normal([self.fea_dim, self.hidden_size]), name="zh_topic_%d_embedding" % (i+1), dtype=tf.float32)
+				en_embeddings.append(tf.nn.embedding_lookup(embedding_en, english_ids))
+				zh_embeddings.append(tf.nn.embedding_lookup(embedding_zh, chinese_ids))
 
+			english_embedding = tf.concat(en_embeddings, 1)
+			chinese_embedding = tf.concat(zh_embeddings, 1)
+			english_embedding= tf.reshape(english_embedding, [self.batch_size, self.topic_num, self.hidden_size])
+			chinese_embedding= tf.reshape(chinese_embedding, [self.batch_size, self.topic_num, self.hidden_size])
+
+		# lstm layer
+		two_lstm_outputs = []
 		for i in range(2):
 			with tf.variable_scope("lstm-%s" % chr(ord('a') + i)):
 				if i == 0:
-					X = english_input
+					X = english_embedding
 				else:
-					X = chinese_input
+					X = chinese_embedding
 
 				cell = BasicLSTMCell(num_units=self.hidden_size)
 				initial_state = cell.zero_state(self.batch_size, tf.float32)
@@ -204,7 +221,7 @@ class LDA_LSTM:
 
 		self.prediction = y
 
-		self.init = tf.initialize_all_variables()
+		self.init = tf.global_variables_initializer()
 
 		# 导出图
 		# print("exporting meta graph......")
@@ -223,7 +240,7 @@ class LDA_LSTM:
 			sess.run(self.init)
 			merged = tf.summary.merge_all()
 			file_writer = tf.summary.FileWriter(self.summary_save_path, sess.graph)
-			for (english_batch, chinese_batch), labels in self.gen_batch():
+			for english_batch, chinese_batch, labels in self.gen_fea_batch():
 				feed_dict = self.gen_feed_dict(english_batch, chinese_batch, labels)
 				loss, _, summary, prediction, global_step = sess.run([self.loss_op, self.train_op, merged, self.prediction, self.global_step], feed_dict=feed_dict)
 				step = global_step % self.save_step
@@ -280,10 +297,31 @@ class LDA_LSTM:
 
 		english_batch = []
 		chinese_batch = []
+		seg_len = 1.0/(self.fea_dim-1)
 
 		for i in range(len(english_topics_batch)):
-			english_input = np.zeros(shape=(self.topic_num, self.topic_num), dtype=np.float32)
-			chinese_input = np.zeros(shape=(self.topic_num, self.topic_num), dtype=np.float32)
+			english_input = np.zeros(shape=(self.topic_num), dtype=np.int32)
+			chinese_input = np.zeros(shape=(self.topic_num), dtype=np.int32)
+
+			english_topics = english_topics_batch[i]
+			chinese_topics = chinese_topics_batch[i]
+
+			for item in english_topics:
+				index = item[0]
+				score = item[1]
+				score_index = int(score/seg_len)
+				english_input[index] = score_index
+
+			for item in chinese_topics:
+				index = item[0]
+				score = item[1]
+				score_index = int(score/seg_len)
+				chinese_input[index] = score_index
+
+			english_batch.append(english_input)
+			chinese_batch.append(chinese_input)
+
+		return english_batch, chinese_batch
 
 	def gen_raw_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
 		if file_a == None or file_b == None:
@@ -335,7 +373,7 @@ class LDA_LSTM:
 
 	def gen_fea_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
 		for a, b, c in self.gen_raw_batch(pos_proportion=pos_proportion, file_a=file_a, file_b=file_b):
-			a_fea, b_fea = self.txt_2_fea_soft_hot(a, b)
+			a_fea, b_fea = self.txt_2_fea_one_hot(a, b)
 			yield a_fea, b_fea, c
 
 	def load_lda(self):
@@ -347,7 +385,7 @@ class LDA_LSTM:
 		scores = 1
 
 	def predict_raw(self, english_raw, chinese_raw):
-		english_batch, chinese_batch = self.txt_2_fea_soft_hot(english_raw, chinese_raw)
+		english_batch, chinese_batch = self.txt_2_fea_one_hot(english_raw, chinese_raw)
 		with tf.Session() as sess:
 			prediction = sess.run([self.prediction], feed_dict={"english_input:0": english_batch, "chinese_input:0": chinese_batch})
 		return prediction
@@ -368,7 +406,7 @@ class LDA_LSTM:
 			saver = tf.train.Saver()
 			saver.restore(sess, self.model_path+"model/model.ckpt")
 			for en_batch, zh_batch, labels in self.gen_raw_batch(file_a="pos_test.txt", file_b="neg_test.txt"):
-				en_fea_batch, zh_fea_batch = self.txt_2_fea_soft_hot(en_batch, zh_batch)
+				en_fea_batch, zh_fea_batch = self.txt_2_fea_one_hot(en_batch, zh_batch)
 				prediction = sess.run([self.prediction], feed_dict={"english_input:0": en_fea_batch, "chinese_input:0": zh_fea_batch})
 				en_writer.update("\n".join(en_batch))
 				zh_writer.update("\n".join(zh_batch))
@@ -384,11 +422,13 @@ if __name__ == "__main__":
 	parser.add_argument('--mode', type=str, default="lda", help='train lda model')
 	parser.add_argument('--topic_num', type=int, default=100, help='lda topic num')
 	parser.add_argument('--batch_size', type=int, default=50, help='batch size')
+	parser.add_argument('--hidden_size', type=int, default=50, help='rnn hidden neuron num')
+	parser.add_argument('--fea_dim', type=int, default=100, help='topic feature dimention num')
 	parser.add_argument('--debug', type=bool, default=False, help='debug mode')
 	args = parser.parse_args()
 	
 	lda = LDA()
-	lda_lstm = LDA_LSTM(topic_num=int(args.topic_num), batch_size=args.batch_size, debug=args.debug)
+	lda_lstm = LDA_LSTM(topic_num=args.topic_num, batch_size=args.batch_size, hidden_size=args.hidden_size, fea_dim=args.fea_dim, debug=args.debug)
 	if args.mode == "train_lda":
 		lda.prepare_train()
 		if args.topic_num is not None:
