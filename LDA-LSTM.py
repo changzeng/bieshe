@@ -7,6 +7,7 @@ from gensim.models import LdaModel
 from gensim.corpora import Dictionary
 import os, thulac, time
 import tensorflow as tf
+from random import shuffle
 from tensorflow.contrib.rnn import BasicLSTMCell
 from tensorflow.contrib.seq2seq import sequence_loss
 from buffer_writer import BufferWriter
@@ -17,6 +18,17 @@ def modify_path(path):
 		return path
 	else:
 		return path+"/"
+
+
+def get_logger(name):
+	logger = logging.getLogger(name)
+	logger.setLevel(level = logging.INFO)
+	handler = logging.FileHandler("log.txt")
+	handler.setLevel(logging.INFO)
+	formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+	handler.setFormatter(formatter)
+	logger.addHandler(handler)
+	return logger
 
 
 class LDA:
@@ -35,13 +47,7 @@ class LDA:
 		except:
 			pass
 
-		self.logger = logging.getLogger("LDA")
-		self.logger.setLevel(level = logging.INFO)
-		handler = logging.FileHandler("log.txt")
-		handler.setLevel(logging.INFO)
-		formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-		handler.setFormatter(formatter)
-		self.logger.addHandler(handler)
+		self.logger = get_logger("LDA")
 
 	def get_model_save_path(self, topic_num):
 		path = "model/LDA/" + "topic_num({topic_num})/".format(topic_num = topic_num)
@@ -158,7 +164,30 @@ class LDA_LSTM:
 
 		self.load_lda()
 		self.build_graph()
-		self.saver = tf.train.Saver() 
+		self.saver = tf.train.Saver()
+		self.logger = get_logger("LSTM")
+
+	def shuffle(self, pos_file="pos.txt", neg_file="neg.txt"):
+		pos_file = self.corpus_path + pos_file
+		neg_file = self.corpus_path + neg_file
+
+		def get_list(file_name):
+			with open(file_name, encoding="utf-8", errors="ignore") as fd:
+				return [line.strip() for line in fd.read().split("\n\n")]
+
+		pos_list = get_list(pos_file)
+		neg_list = get_list(neg_file)
+		shuffle(pos_list)
+		shuffle(neg_list)
+
+		pos_writter = BufferWriter(pos_file, sep="\n\n")
+		neg_writter = BufferWriter(neg_file, sep="\n\n")
+
+		pos_writter.update_list(pos_list)
+		neg_writter.update_list(neg_list)
+
+		pos_writter.close()
+		neg_writter.close()
 
 	def build_graph(self):
 		english_input = tf.placeholder(tf.int32, [None, self.topic_num], name="english_input")
@@ -236,6 +265,7 @@ class LDA_LSTM:
 		return {"english_input:0": english_batch, "chinese_input:0": chinese_batch, "scores:0": scores}
 
 	def train(self):
+		# self.shuffle()
 		with tf.Session() as sess:
 			sess.run(self.init)
 			merged = tf.summary.merge_all()
