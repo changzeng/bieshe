@@ -1,0 +1,500 @@
+    5  ls -al
+    6  cd ..
+    7  ls -al
+    8  rm * -rf
+    9  ls -al
+   10  cd ..
+   11  cd ..
+   12  ls -al
+   13  python LDA-LSTM.py --mode="train" --topic_num=130
+   14  python LDA-LSTM.py --mode="train" --topic_num=130
+   15  python LDA-LSTM.py --mode="train" --topic_num=130
+   16  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+   17  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+   18  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+   19  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+   20  ls -al
+   21  ls -al
+   22  cd model/
+   23  ls -al
+   24  cd LSTM/
+   25  ls -al
+   26  cd topic_num\(130\)-hidden_size\(100\)-batch_size\(50\)/
+   27  ls -al
+   28  cd ..
+   29  ls -al
+   30  python
+   31  cd ..
+   32  cd ..
+   33  history
+   34  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --debug=True
+   35  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --debug=True
+   36  python LDA-LSTM.py --mode="train_lstm" --batch_size=100 --topic_num=130 --debug=True
+   37  python
+   38  python flask_site.py 
+   39  python flask_site.py 
+   40  cd corpus
+   41  ls -al
+   42  cd raw/
+   43  ls -al
+   44  cd chinese_and_english/
+   45  ls -al
+   46  ls -alh
+   47  vi news-commentary-v12.zh-en.en
+   48  ls -al
+   49  ls -al
+   50  cd ..
+   51  ls -al
+   52  cd ..
+   53  ls -al
+   54  ls -al
+   55  cd raw/
+   56  ls -al
+   57  ls -alh
+   58  chrmode 333 news-commentary-v12.zh-en.zh.raw
+   59  chrmod 333 news-commentary-v12.zh-en.zh.raw
+   60  chmod 333 news-commentary-v12.zh-en.zh.raw
+   61  ls -alh
+   62  chmode 666 news-commentary-v12.zh-en.zh.raw
+   63  chmod 666 news-commentary-v12.zh-en.zh.raw
+   64  ls -al
+   65  ls -al
+   66  cd chinese_and_english/
+   67  ls -al
+   68  sed -i '1,61080d' news-commentary-v12.zh-en.en.raw 
+   69  sed -i '1,61080' news-commentary-v12.zh-en.en.raw 
+   70  vi news-commentary-v12.zh-en.en.raw 
+   71  eixt
+   72  exit
+   73  exit
+   74  cd ..
+   75  cd ..
+   76  cd ..
+   77  cd ..
+   78  cd deep-learning/
+   79  ls -[al
+   80  ls -al
+   81  cd zh-NER-TF/
+   82  ls -al
+   83  cd data_path_save/
+   84  ls -al
+   85  cd 1499785642/
+   86  ls -al
+   87  cd summaries/
+   88  ls -al
+   89  cd ..
+   90  cd results/
+   91  ls -al
+   92  cd ..
+   93  cd results/
+   94  vi log.txt 
+   95  cd ..
+   96  ls -al
+   97  cd summaries/
+   98  ls -al
+   99  cd sum
+  100  ls -al
+  101  cd ..
+  102  cd ..
+  103  cd ..
+  104  cd ..
+  105  cd ..
+  106  cd bishe
+  107  cd model/
+  108  ls -al
+  109  cd LSTM/
+  110  ls -al
+  111  tensorboard topic_num\(130\)-hidden_size\(100\)-batch_size\(50\)/
+  112  tensorboard --logdir=topic_num\(130\)-hidden_size\(100\)-batch_size\(50\)/
+  113  tensorboard --logdir=topic_num\(130\)-hidden_size\(100\)-batch_size\(50\)/
+  114  tensorboard --logdir=topic_num\(130\)-hidden_size\(100\)-batch_size\(50\)/summary/
+  115  ls -al
+  116  tensorboard --logdir=topic_num\(130\)-hidden_size\(100\)-batch_size\(100\)/summary/
+  117  tensorboard --logdir=topic_num\(130\)-hidden_size\(100\)-batch_size\(100\)/summary/
+  118  ls -al
+  119  pwd
+  120  rm id_rsa 
+  121  python
+  122  cd project/bishe
+  123  ls -al
+  124  python corpus_generation.py 
+  125  python corpus_generation.py 
+  126  python corpus_generation.py 
+  127  vi output.txt 
+  128  rm output.txt 
+  129  python corpus_generation.py 
+  130  vi output.txt 
+  131  vi output.txt 
+  132  python corpus_generation.py 
+  133  rm output.txt 
+  134  python corpus_generation.py 
+  135  vi output.txt 
+  136  rm output.txt 
+  137  python corpus_generation.py 
+  138  vi output.txt 
+  139  rm output.txt 
+  140  rm output.txt 
+  141  python corpus_generation.py 
+  142  vi output.txt 
+  143  python corpus_generation.py 
+  144  rm output.txt 
+  145  python corpus_generation.py 
+  146  python corpus_generation.py 
+  147  python corpus_generation.py 
+  148  python corpus_generation.py 
+  149  python corpus_generation.py 
+  150  python corpus_generation.py 
+  151  python corpus_generation.py 
+  152  python corpus_generation.py 
+  153  python corpus_generation.py 
+  154  python corpus_generation.py 
+  155  ls -al
+  156  python corpus_generation.py 
+  157  ls -al
+  158  rm output.txt 
+  159  python corpus_generation.py 
+  160  python corpus_generation.py 
+  161  python corpus_generation.py 
+  162  python corpus_generation.py 
+  163  python corpus_generation.py 
+  164  python corpus_generation.py 
+  165  python corpus_generation.py 
+  166  ls -al
+  167  rm output.txt 
+  168  vi neg.txt 
+  169  python corpus_generation.py 
+  170  python corpus_generation.py 
+  171  python corpus_generation.py 
+  172  python corpus_generation.py 
+  173  python corpus_generation.py 
+  174  python corpus_generation.py 
+  175  python corpus_generation.py 
+  176  python corpus_generation.py 
+  177  python corpus_generation.py 
+  178  python corpus_generation.py 
+  179  python corpus_generation.py 
+  180  python corpus_generation.py 
+  181  python corpus_generation.py 
+  182  python corpus_generation.py 
+  183  python corpus_generation.py 
+  184  python corpus_generation.py 
+  185  python corpus_generation.py 
+  186  python corpus_generation.py 
+  187  python corpus_generation.py 
+  188  python corpus_generation.py 
+  189  python corpus_generation.py 
+  190  python corpus_generation.py 
+  191  python corpus_generation.py 
+  192  python corpus_generation.py 
+  193  python corpus_generation.py 
+  194  python corpus_generation.py 
+  195  ls -al
+  196  cd corpus/raw/
+  197  ls -al
+  198  cd chinese_and_english/
+  199  ls -al
+  200  head -60000 news-commentary-v12.zh-en.en.raw > news-commentary-v12.zh-en.en
+  201  head -60000 news-commentary-v12.zh-en.zh.raw > news-commentary-v12.zh-en.zh
+  202  vi news-commentary-v12.zh-en.en
+  203  vi news-commentary-v12.zh-en.zh
+  204  ls -alh
+  205  cd ..
+  206  cd ..
+  207  cd ..
+  208  python corpus_generation.py 
+  209  ls -al
+  210  ls -alh
+  211  rm neg.txt pos.txt 
+  212  python corpus_generation.py 
+  213  ls -alh
+  214  vi neg.txt 
+  215  vi pos.txt 
+  216  rm neg.txt pos.txt 
+  217  python corpus_generation.py 
+  218  ls -alh
+  219  vi pos.txt 
+  220  mv pos.txt corpus
+  221  mv neg.txt corpus
+  222  cd corpus
+  223  ls -al
+  224  mv neg.txt avaliable/
+  225  mv pos.txt avaliable/
+  226  cd avaliable/
+  227  ls -al
+  228  rm kaoyan_reading .DS_Store six_translation 
+  229  ls -al
+  230  rm 政治文献20121128
+  231  rm 政治文献20121229
+  232  ls -al
+  233  cd ..
+  234  cd ..
+  235  python LDA-LSTM.py --mode="tran_lda" --topic_num=100
+  236  tmux
+  237  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  238  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  239  python LDA-LSTM.py --mode="train_lstm" --topic_num=100
+  240  ls -al
+  241  ls -al
+  242  cd model/
+  243  ls -al
+  244  cd LSTM/
+  245  ls -al
+  246  cd topic_num\(100\)-hidden_size\(100\)-batch_size\(50\)/
+  247  ls -al
+  248  cd -
+  249  cd ..
+  250  cd ..
+  251  ls -al
+  252  python LDA-LSTM.py --mode="train_lstm" --topic_num=100
+  253  python LDA-LSTM.py --mode="train_lstm" --topic_num=100
+  254  tmux
+  255  tmux
+  256  python LDA-LSTM.py --mode="train_lstm" --topic_num=100
+  257  tmux 
+  258  ls -al
+  259  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  260  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  261  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  262  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  263  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  264  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  265  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  266  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  267  python LDA-LSTM.py --mode="train_lstm" --topic_num=130
+  268  cd ..
+  269  ls -al
+  270  cd Share/
+  271  ls -al
+  272  cd ..
+  273  ls -al
+  274  rm bishe.zip 
+  275  cd bishe/
+  276  ls -al
+  277  git add *
+  278  git commit -m "add tensorboard scalar"
+  279  git push origin master
+  280  exit
+  281  cd project/
+  282  cd bishe
+  283  ls -al
+  284  cd model/
+  285  ls -al
+  286  cd LSTM/
+  287  ls -al
+  288  cd topic_num\(130\)-hidden_size\(100\)-batch_size\(50\)/
+  289  ls -al
+  290  ls -alh
+  291  ls -alh
+  292  ls -alh
+  293  ls -alh
+  294  tmux
+  295  cd project/
+  296  ls -al
+  297  cd recommend_system/
+  298  ls -al
+  299  git 
+  300  ls -al
+  301  git clone https://github.com/X-Brain/News-Recommend-System.git
+  302  ls -al
+  303  cd summary/
+  304  ls -al
+  305  ls -al
+  306  cd ..
+  307  ls -al
+  308  cd summary/
+  309  ls -al
+  310  ls -al
+  311  cd ..
+  312  cd ..
+  313  cd ..
+  314  cd ../corpus/raw/
+  315  ls -al
+  316  cd chinese_and_english/
+  317  ls -al
+  318  ls -al
+  319  head -1000 news-commentary-v12.zh-en.en.raw > news-commentary-v12.zh-en.en.test
+  320  head -1000 news-commentary-v12.zh-en.zh.raw > news-commentary-v12.zh-en.zh.test
+  321  vi news-commentary-v12.zh-en.en.test 
+  322  vi news-commentary-v12.zh-en.en.test 
+  323  ls -al
+  324  vi news-commentary-v12.zh-en.en
+  325  vi vi news-commentary-v12.zh-en.zh.raw
+  326  vi vi news-commentary-v12.zh-en.zh.raw
+  327  ls -al
+  328  vi news-commentary-v12.zh-en.zh.raw
+  329  vi news-commentary-v12.zh-en.en.raw
+  330  ls -al
+  331  cd ..
+  332  ls -al
+  333  cp chinese_and_english/ chinese_and_english_copy
+  334  cp -r chinese_and_english/ chinese_and_english_copy
+  335  ls -al
+  336  cd chinese_and_english
+  337  ls -al
+  338  vi news-commentary-v12.zh-en.zh
+  339  vi news-commentary-v12.zh-en.zh.test
+  340  ls -al
+  341  cd ..
+  342  cd ..
+  343  cd ../model/
+  344  ls -al
+  345  cd LSTM/
+  346  ls -al
+  347  rm * -rf
+  348  ls -al
+  349  cd topic_num\(130\)-hidden_size\(100\)-batch_size\(100\)/
+  350  ls -al
+  351  cd model/
+  352  ls -al
+  353  cd ..
+  354  cd ..
+  355  ls -al
+  356  cd topic_num\(130\)-hidden_size\(100\)-batch_size\(100\)/
+  357  ls -al
+  358  cd model/
+  359  ls -al
+  360  cd .
+  361  cd ..
+  362  cd model/
+  363  ls -al
+  364  cd ..
+  365  cd summary/
+  366  ls -al
+  367  cd .
+  368  cd ..
+  369  cd ..
+  370  cd ..
+  371  ls -al
+  372  cd LDA/
+  373  ls -al
+  374  cd topic_num\(30\)/
+  375  ls -al
+  376  cd ..
+  377  cd ..
+  378  cd LSTM/
+  379  ls -al
+  380  cd topic_num\(130\)-hidden_size\(100\)-batch_size\(100\)/
+  381  ls -al
+  382  cd model/
+  383  ls -al
+  384  ls -alh
+  385  open https://github.com
+  386  cd ..
+  387  cd ..
+  388  cd ..
+  389  ls -al
+  390  python corpus_generation.py 
+  391  python corpus_generation.py 
+  392  python corpus_generation.py 
+  393  python corpus_generation.py 
+  394  python corpus_generation.py 
+  395  vi corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en.test
+  396  vi corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en.test.cut
+  397  vi corpus/raw/chinese_and_english/news-commentary-v12.zh-en.en.test.cut
+  398  python corpus_generation.py 
+  399  ls -al
+  400  cd corpus
+  401  ls -al
+  402  cd ..
+  403  cd corpus
+  404  ls -al
+  405  cd avaliable/
+  406  ls -al
+  407  ls -al
+  408  ls -al
+  409  rm *
+  410  ls -al
+  411  ls -al
+  412  ls -alh
+  413  ls -al
+  414  ls -alh
+  415  vi neg_test.txt 
+  416  vi neg_test.txt 
+  417  cd ..
+  418  cd ..
+  419  git add *
+  420  git commit -m "add test data generation code"
+  421  git log
+  422  ls -al
+  423  git diff corpus_generation.py 
+  424  vi log.txt 
+  425  python LDA-LSTM.py --mode="test" --topic_num=130 --batch_size=100
+  426  python LDA-LSTM.py --mode="test" --topic_num=130 --batch_size=100
+  427  python LDA-LSTM.py --mode="test" --topic_num=130 --batch_size=100
+  428  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  429  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  430  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  431  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  432  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  433  git add *
+  434  git commit -m "fit txt_2_fea chinest segmentation bug"
+  435  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  436  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  437  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  438  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  439  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  440  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  441  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  442  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  443  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  444  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  445  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  446  git log
+  447  git push origin master
+  448  python LDA-LSTM.py --mode="train_lstm" --topic_num=130 --batch_size=100
+  449  ls -al
+  450  git add buffer_writer.py 
+  451  git commit -m "add buffer writer"
+  452  git diff LDA-LSTM.py 
+  453  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  454  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  455  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  456  python
+  457  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  458  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  459  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  460  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  461  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  462  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  463  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  464  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  465  python LDA-LSTM.py --mode="test_lstm" --topic_num=130 --batch_size=100
+  466  git diff
+  467  git log
+  468  git diff
+  469  git add *
+  470  git commit -m "add more function on fea generation"
+  471  git push -u origin master
+  472  cd ..
+  473  cd ..
+  474  cd ..
+  475  cd corpus
+  476  ls -al
+  477  cd avaliable/
+  478  ls -al
+  479  ls -alh
+  480  vi neg.txt 
+  481  cd ..
+  482  cd ..
+  483  python corpus_generation.py --mode="train"
+  484  python corpus_generation.py --mode="test"
+  485  ls -al
+  486  cd -
+  487  cd avaliable/
+  488  ls -al
+  489  history
+  490  ls -al
+  491  history > history.txt
+  492  vi history.txt 
+  493  cd ../../model/LSTM/
+  494  ls -al
+  495  tensorboard --logdir=topic_num\(130\)-hidden_size\(100\)-batch_size\(100\)/
+  496  pwd
+  497  ls -al
+  498  exit
+  499  tmux
+  500  exit
+  501  cd project/bishe/
+  502  ls -al
+  503  history
+  504  history > hisotry.txt 

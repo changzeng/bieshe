@@ -22,8 +22,8 @@ class Generator(object):
         # key parameters
         self.max_corpus_size = 50 * 1024 * 1024
         self.neg_num = 10
-        self.min_line_num = 10
-        self.max_line_num = 100
+        self.min_line_num = 100
+        self.max_line_num = 150
         self.line_step = 2
 
         self.load_stopwords()
@@ -191,7 +191,6 @@ class Generator(object):
                 en_lines = self.fetch(self.en_lines, en_line_list)
                 zh_lines = self.fetch(self.zh_lines, zh_line_list)
                 yield self.make_str(en_lines, zh_lines)
-
 
     def discrete_neg_samples(self, num=100, file_name="neg.txt"):
         self.father_func(self.discrete_neg_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
