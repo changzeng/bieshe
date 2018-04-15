@@ -139,13 +139,14 @@ class LDA:
 
 
 class LDA_LSTM:
-	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=False, fea_dim=20):
+	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=False, fea_dim=20, train_epoch_num=10):
+		self.train_epoch_num = train_epoch_num
 		self.fea_dim = fea_dim
 		self.batch_size = batch_size
 		self.topic_num = topic_num
 		self.hidden_size = hidden_size
 		self.corpus_path = modify_path(corpus_path)
-		self.save_step = 30
+		self.save_step = 60
 		self.thu = thulac.thulac(seg_only=True)
 		self.model_path = "./model/LSTM/topic_num(%d)-hidden_size(%d)-batch_size(%d)-fead_dim(%d)/" % (self.topic_num, self.hidden_size, self.batch_size, self.fea_dim)
 		self.model_save_path = self.model_path + "model/"
@@ -168,6 +169,7 @@ class LDA_LSTM:
 		self.logger = get_logger("LSTM")
 
 	def shuffle(self, pos_file="pos.txt", neg_file="neg.txt"):
+		self.logger.info("start shuffle <%s> and <%s>" % (pos_file, neg_file))
 		pos_file = self.corpus_path + pos_file
 		neg_file = self.corpus_path + neg_file
 
@@ -189,11 +191,13 @@ class LDA_LSTM:
 		pos_writter.close()
 		neg_writter.close()
 
+		self.logger.info("shuffle Done! <%s> and <%s>" % (pos_file, neg_file))
+
 	def build_graph(self):
-		english_input = tf.placeholder(tf.int32, [None, self.topic_num], name="english_input")
-		chinese_input = tf.placeholder(tf.int32, [None, self.topic_num], name="chinese_input")
+		english_input = tf.placeholder(tf.int32, [self.batch_size, self.topic_num], name="english_input")
+		chinese_input = tf.placeholder(tf.int32, [self.batch_size, self.topic_num], name="chinese_input")
 		
-		Y = tf.placeholder(tf.float32, [None], name="scores")
+		Y = tf.placeholder(tf.float32, [self.batch_size], name="scores")
 
 		# embedding layer
 		with tf.variable_scope("embdding"):
@@ -232,14 +236,27 @@ class LDA_LSTM:
 				two_lstm_outputs.append(tf.reshape(outputs, [-1, self.hidden_size]))
 
 		# concat and reshape output
-		concat_outputs = tf.concat(two_lstm_outputs, 1)
-		concat_outputs = tf.reshape(concat_outputs, [-1, 2*self.hidden_size])
+		# concat_outputs = tf.concat(two_lstm_outputs, 1)
+		# concat_outputs = tf.reshape(concat_outputs, [-1, 2*self.hidden_size])
 
 		# full connected layer
-		w = tf.Variable(tf.random_normal([2*self.hidden_size, 1]), name="weight", dtype=tf.float32)
-		b = tf.Variable(tf.constant(1.0), name="bias", dtype=tf.float32)
-		y = tf.matmul(concat_outputs, w) + b
-		y = tf.nn.sigmoid(y)
+		# w = tf.Variable(tf.random_normal([2*self.hidden_size, 1]), name="weight", dtype=tf.float32)
+		# b = tf.Variable(tf.constant(1.0), name="bias", dtype=tf.float32)
+		# y = tf.matmul(concat_outputs, w) + b
+		# y = tf.nn.sigmoid(y)
+
+		# get lstm_a output and lstm_b output
+		lstm_a_output = two_lstm_outputs[0]
+		lstm_b_output = two_lstm_outputs[1]
+
+		# cosine similariy
+		numerator = tf.reduce_sum(lstm_a_output * lstm_b_output, 1)
+		denominator = tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output), 1)) * tf.sqrt(tf.reduce_sum(tf.square(lstm_b_output), 1))
+		y = tf.exp(-numerator / denominator)
+		# Euclidean distance
+		# y = tf.exp(-tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output - lstm_b_output), 1)))
+		# reshape y
+		y = tf.reshape(y, [self.batch_size])
 
 		self.global_step = tf.Variable(0, trainable=False)  
 		self.learning_rate = tf.train.exponential_decay(0.1, self.global_step, 10, 2, staircase=False)  
@@ -247,6 +264,7 @@ class LDA_LSTM:
 		self.train_op = tf.train.AdamOptimizer(learning_rate=0.1).minimize(self.loss_op, global_step=self.global_step)
 
 		tf.summary.scalar("loss", self.loss_op)
+		tf.summary.histogram("prediction", y)
 
 		self.prediction = y
 
@@ -265,21 +283,22 @@ class LDA_LSTM:
 		return {"english_input:0": english_batch, "chinese_input:0": chinese_batch, "scores:0": scores}
 
 	def train(self):
-		# self.shuffle()
 		with tf.Session() as sess:
 			sess.run(self.init)
 			merged = tf.summary.merge_all()
 			file_writer = tf.summary.FileWriter(self.summary_save_path, sess.graph)
-			for english_batch, chinese_batch, labels in self.gen_fea_batch():
-				feed_dict = self.gen_feed_dict(english_batch, chinese_batch, labels)
-				loss, _, summary, prediction, global_step = sess.run([self.loss_op, self.train_op, merged, self.prediction, self.global_step], feed_dict=feed_dict)
-				step = global_step % self.save_step
-				print("current_step/save_step: (%4d)/(%4d)" % (self.save_step if step == 0 else step, self.save_step))
-				if global_step % self.save_step == 0:
-					print("saving model....")
-					self.saver.save(sess, self.model_save_path+"model.ckpt")
-				# write summary
-				file_writer.add_summary(summary, global_step)
+			for train_epoch in range(1, self.train_epoch_num+1):
+				fea_batches = self.gen_fea_batch()
+				for english_batch, chinese_batch, labels in fea_batches:
+					feed_dict = self.gen_feed_dict(english_batch, chinese_batch, labels)
+					loss, _, summary, prediction, global_step = sess.run([self.loss_op, self.train_op, merged, self.prediction, self.global_step], feed_dict=feed_dict)
+					step = global_step % self.save_step
+					print("cur_epoch/total_epoch: (%3d)/(%3d), current_step/save_step: (%4d)/(%4d), global_step: %4d" % (train_epoch, self.train_epoch_num, self.save_step if step == 0 else step, self.save_step, global_step))
+					if global_step % self.save_step == 0:
+						print("saving model....")
+						self.saver.save(sess, self.model_save_path+"model.ckpt")
+					# write summary
+					file_writer.add_summary(summary, global_step)
 
 	def txt_2_fea_soft_hot(self, english_batch, chinese_batch):
 		english_batch = [english.split() for english in english_batch]
@@ -355,6 +374,7 @@ class LDA_LSTM:
 
 	def gen_raw_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
 		if file_a == None or file_b == None:
+			self.shuffle()
 			pos_file = self.corpus_path+"pos.txt"
 			neg_file = self.corpus_path+"neg.txt"
 		else:
@@ -367,11 +387,11 @@ class LDA_LSTM:
 		batch_num = 0
 		english_batch = []
 		chinese_batch = []
-		score_list = []
-
+		
 		with open(pos_file, encoding="utf-8", errors="ignore") as pos_fd:
 			with open(neg_file, encoding="utf-8", errors="ignore") as neg_fd:
 				while True:
+					score_list = []
 					for _ in range(pos_num):
 						english = pos_fd.readline().strip()
 						chinese = pos_fd.readline().strip()
@@ -393,9 +413,12 @@ class LDA_LSTM:
 						english_batch.append(english)
 						chinese_batch.append(chinese)
 						score_list.append(0)
-
 					# saving model
 					if batch_num % self.batch_size == 0:
+						# print(english_batch)
+						# input()
+						# print(chinese_batch)
+						# input()
 						yield english_batch, chinese_batch, np.array(score_list, dtype=np.float32)
 						english_batch = []
 						chinese_batch = []
