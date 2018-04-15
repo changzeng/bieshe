@@ -11,6 +11,7 @@ from random import shuffle
 from tensorflow.contrib.rnn import BasicLSTMCell
 from tensorflow.contrib.seq2seq import sequence_loss
 from buffer_writer import BufferWriter
+from shuffler import Shuffler
 
 
 def modify_path(path):
@@ -161,39 +162,24 @@ class LDA_LSTM:
 			if not os.path.exists(_dir):
 				os.mkdir(_dir)
 
-		self.load_stopwords()
+		self.logger = get_logger("LSTM")
+		self.shuffler = Shuffler()
 
+		self.load_stopwords()
 		self.load_lda()
 		self.build_graph()
 		self.saver = tf.train.Saver()
-		self.logger = get_logger("LSTM")
 
 	def shuffle(self, pos_file="pos.txt", neg_file="neg.txt"):
 		self.logger.info("start shuffle <%s> and <%s>" % (pos_file, neg_file))
-		pos_file = self.corpus_path + pos_file
-		neg_file = self.corpus_path + neg_file
 
-		def get_list(file_name):
-			with open(file_name, encoding="utf-8", errors="ignore") as fd:
-				return [line.strip() for line in fd.read().split("\n\n")]
-
-		pos_list = get_list(pos_file)
-		neg_list = get_list(neg_file)
-		shuffle(pos_list)
-		shuffle(neg_list)
-
-		pos_writter = BufferWriter(pos_file, sep="\n\n")
-		neg_writter = BufferWriter(neg_file, sep="\n\n")
-
-		pos_writter.update_list(pos_list)
-		neg_writter.update_list(neg_list)
-
-		pos_writter.close()
-		neg_writter.close()
+		self.shuffler.shuffle(self.corpus_path+pos_file)
+		self.shuffler.shuffle(self.corpus_path+neg_file)
 
 		self.logger.info("shuffle Done! <%s> and <%s>" % (pos_file, neg_file))
 
 	def build_graph(self):
+		self.logger.info("start building graph")
 		english_input = tf.placeholder(tf.int32, [self.batch_size, self.topic_num], name="english_input")
 		chinese_input = tf.placeholder(tf.int32, [self.batch_size, self.topic_num], name="chinese_input")
 		
@@ -236,25 +222,26 @@ class LDA_LSTM:
 				two_lstm_outputs.append(tf.reshape(outputs, [-1, self.hidden_size]))
 
 		# concat and reshape output
-		# concat_outputs = tf.concat(two_lstm_outputs, 1)
-		# concat_outputs = tf.reshape(concat_outputs, [-1, 2*self.hidden_size])
+		concat_outputs = tf.concat(two_lstm_outputs, 1)
+		concat_outputs = tf.reshape(concat_outputs, [-1, 2*self.hidden_size])
 
 		# full connected layer
-		# w = tf.Variable(tf.random_normal([2*self.hidden_size, 1]), name="weight", dtype=tf.float32)
-		# b = tf.Variable(tf.constant(1.0), name="bias", dtype=tf.float32)
-		# y = tf.matmul(concat_outputs, w) + b
-		# y = tf.nn.sigmoid(y)
+		w = tf.Variable(tf.random_normal([2*self.hidden_size, 1]), name="weight", dtype=tf.float32)
+		b = tf.Variable(tf.constant(1.0), name="bias", dtype=tf.float32)
+		y = tf.matmul(concat_outputs, w) + b
+		y = tf.exp(-tf.nn.relu(y))
 
 		# get lstm_a output and lstm_b output
-		lstm_a_output = two_lstm_outputs[0]
-		lstm_b_output = two_lstm_outputs[1]
+		# lstm_a_output = two_lstm_outputs[0]
+		# lstm_b_output = two_lstm_outputs[1]
 
 		# cosine similariy
-		numerator = tf.reduce_sum(lstm_a_output * lstm_b_output, 1)
-		denominator = tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output), 1)) * tf.sqrt(tf.reduce_sum(tf.square(lstm_b_output), 1))
-		y = tf.exp(-numerator / denominator)
+		# numerator = tf.reduce_sum(lstm_a_output * lstm_b_output, 1)
+		# denominator = tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output), 1)) * tf.sqrt(tf.reduce_sum(tf.square(lstm_b_output), 1))
+		# y = tf.exp(-numerator / denominator)
 		# Euclidean distance
 		# y = tf.exp(-tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output - lstm_b_output), 1)))
+		
 		# reshape y
 		y = tf.reshape(y, [self.batch_size])
 
@@ -274,10 +261,14 @@ class LDA_LSTM:
 		# print("exporting meta graph......")
 		# tf.train.export_meta_graph(filename=self.model_path+"model.ckpt.meta") 
 
+		self.logger.info("Done! building graph")
+
 	def load_stopwords(self):
+		self.logger.info("start load stopwords")
 		with open("stopwords.txt", encoding="utf-8") as fd:
 			txt = fd.read()
 			self.stopwords = set(txt.split("\n"))
+		self.logger.info("Done! load stopwords")
 
 	def gen_feed_dict(self, english_batch, chinese_batch, scores):
 		return {"english_input:0": english_batch, "chinese_input:0": chinese_batch, "scores:0": scores}
@@ -430,12 +421,14 @@ class LDA_LSTM:
 			yield a_fea, b_fea, c
 
 	def load_lda(self):
+		self.logger.info("start loading lda model")
 		lda = LDA(topic_num=self.topic_num)
 		lda.load_model()
 
 		self.english_lda = lda.english_model
 		self.chinese_lda = lda.chinese_model
-		scores = 1
+
+		self.logger.info("Done! loading lda model")
 
 	def predict_raw(self, english_raw, chinese_raw):
 		english_batch, chinese_batch = self.txt_2_fea_one_hot(english_raw, chinese_raw)
