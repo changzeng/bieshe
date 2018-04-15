@@ -30,7 +30,7 @@ class BufferWriter(object):
 
 	def write_to_file(self):
 		print("writting to %s" % self.file_name)
-		with open(self.file_name, encoding="utf-8", errors="ignore", "a") as fd:
+		with open(self.file_name, "a", encoding="utf-8", errors="ignore") as fd:
 			fd.write(self.sep.join(self.records))
 			fd.write(self.sep)
 
