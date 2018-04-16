@@ -68,10 +68,12 @@ class LDA:
 		corpus = []
 
 		for _file in files:
+			if _file in (".DS_Store", ".gitignore"):
+				continue
 			with open(_file, encoding="utf-8", errors="ignore") as fd:
 				txt = fd.read()
 				docs = txt.split("\n\n")[:-1]
-				corpus += map(lambda x:x.split("\n"), docs)
+				corpus += map(lambda x:x.split("\n")[:2], docs)
 		
 		english, chinese = zip(*corpus)
 		english = [sentence.strip() for sentence in english]
@@ -459,7 +461,8 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 	
 	lda = LDA()
-	lda_lstm = LDA_LSTM(topic_num=args.topic_num, batch_size=args.batch_size, hidden_size=args.hidden_size, fea_dim=args.fea_dim, debug=args.debug)
+	if "lstm" in args.mode:
+		lda_lstm = LDA_LSTM(topic_num=args.topic_num, batch_size=args.batch_size, hidden_size=args.hidden_size, fea_dim=args.fea_dim, debug=args.debug)
 	if args.mode == "train_lda":
 		lda.prepare_train()
 		if args.topic_num is not None:
