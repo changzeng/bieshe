@@ -222,23 +222,22 @@ class LDA_LSTM:
 				two_lstm_outputs.append(tf.reshape(outputs, [-1, self.hidden_size]))
 
 		# concat and reshape output
-		concat_outputs = tf.concat(two_lstm_outputs, 1)
-		concat_outputs = tf.reshape(concat_outputs, [-1, 2*self.hidden_size])
-
+		# concat_outputs = tf.concat(two_lstm_outputs, 1)
+		# concat_outputs = tf.reshape(concat_outputs, [-1, 2*self.hidden_size])
 		# full connected layer
-		w = tf.Variable(tf.random_normal([2*self.hidden_size, 1]), name="weight", dtype=tf.float32)
-		b = tf.Variable(tf.constant(1.0), name="bias", dtype=tf.float32)
-		y = tf.matmul(concat_outputs, w) + b
-		y = tf.exp(-tf.nn.relu(y))
+		# w = tf.Variable(tf.random_normal([2*self.hidden_size, 1]), name="weight", dtype=tf.float32)
+		# b = tf.Variable(tf.constant(1.0), name="bias", dtype=tf.float32)
+		# y = tf.matmul(concat_outputs, w) + b
+		# y = tf.exp(-tf.nn.relu(y))
 
 		# get lstm_a output and lstm_b output
-		# lstm_a_output = two_lstm_outputs[0]
-		# lstm_b_output = two_lstm_outputs[1]
+		lstm_a_output = two_lstm_outputs[0]
+		lstm_b_output = two_lstm_outputs[1]
 
 		# cosine similariy
-		# numerator = tf.reduce_sum(lstm_a_output * lstm_b_output, 1)
-		# denominator = tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output), 1)) * tf.sqrt(tf.reduce_sum(tf.square(lstm_b_output), 1))
-		# y = tf.exp(-numerator / denominator)
+		numerator = tf.reduce_sum(lstm_a_output * lstm_b_output, 1)
+		denominator = tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output), 1)) * tf.sqrt(tf.reduce_sum(tf.square(lstm_b_output), 1))
+		y = 1 - (tf.acos((numerator / denominator)) / tf.constant(3.141592653))
 		# Euclidean distance
 		# y = tf.exp(-tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output - lstm_b_output), 1)))
 		
@@ -275,9 +274,13 @@ class LDA_LSTM:
 
 	def train(self):
 		with tf.Session() as sess:
+			self.logger.info("start initialization...")
 			sess.run(self.init)
+			self.logger.info("Done! initialization...")
 			merged = tf.summary.merge_all()
+			self.logger.info("Done! merge all variables")
 			file_writer = tf.summary.FileWriter(self.summary_save_path, sess.graph)
+			self.logger.info("Done! create summary <FileWriter>")
 			for train_epoch in range(1, self.train_epoch_num+1):
 				fea_batches = self.gen_fea_batch()
 				for english_batch, chinese_batch, labels in fea_batches:
