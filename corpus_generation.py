@@ -260,6 +260,6 @@ if __name__ == "__main__":
 
     generator = Generator()
     if args.mode == "train":
-        generator.gen_train_dataset(2 * 10000)
+        generator.gen_train_dataset(5000)
     elif args.mode == "test":
         generator.gen_test_dataset(3000)
