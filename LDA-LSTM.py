@@ -170,13 +170,19 @@ class LDA_LSTM:
 		self.build_graph()
 		self.saver = tf.train.Saver()
 
-	def shuffle(self, pos_file="pos.txt", neg_file="neg.txt"):
-		self.logger.info("start shuffle <%s> and <%s>" % (pos_file, neg_file))
+	def shuffle(self, input_file_list, output_file):
+		self.logger.info("start shuffle")
 
-		self.shuffler.shuffle(self.corpus_path+pos_file)
-		self.shuffler.shuffle(self.corpus_path+neg_file)
+		self.shuffler.shuffle_mul_file([self.corpus_path+_file for _file in input_file_list], self.corpus_path+output_file)
 
-		self.logger.info("shuffle Done! <%s> and <%s>" % (pos_file, neg_file))
+		self.logger.info("shuffle Done!")
+
+	def shuffle_train_data(self):
+		self.shuffle(["mix.txt", "neg.txt", "pos.txt"], "train.txt")
+
+	def shuffle_test_data(self):
+		self.shuffle(["mix_test.txt", "neg_test.txt", "pos_test.txt"], "test.txt")
+
 
 	def build_graph(self):
 		self.logger.info("start building graph")
@@ -278,11 +284,12 @@ class LDA_LSTM:
 			sess.run(self.init)
 			self.logger.info("Done! initialization...")
 			merged = tf.summary.merge_all()
-			self.logger.info("Done! merge all variables")
+			self.logger.info("Done! merge all summary")
 			file_writer = tf.summary.FileWriter(self.summary_save_path, sess.graph)
 			self.logger.info("Done! create summary <FileWriter>")
 			for train_epoch in range(1, self.train_epoch_num+1):
-				fea_batches = self.gen_fea_batch()
+				self.shuffle_train_data()
+				fea_batches = self.gen_fea_batch(self.corpus_path + "train.txt")
 				for english_batch, chinese_batch, labels in fea_batches:
 					feed_dict = self.gen_feed_dict(english_batch, chinese_batch, labels)
 					loss, _, summary, prediction, global_step = sess.run([self.loss_op, self.train_op, merged, self.prediction, self.global_step], feed_dict=feed_dict)
@@ -329,8 +336,8 @@ class LDA_LSTM:
 		return english_batch, chinese_batch
 
 	def txt_2_fea_one_hot(self, english_batch, chinese_batch):
-		english_batch = [english.split() for english in english_batch]
-		chinese_batch = [chinese.split() for chinese in chinese_batch]
+		english_batch = [[word for word in english.split() if len(word.strip()) > 0] for english in english_batch]
+		chinese_batch = [[word for word in chinese.split() if len(word.strip()) > 0] for chinese in chinese_batch]
 		
 		english_bow_batch = [self.english_lda.id2word.doc2bow(english_words) for english_words in english_batch]
 		chinese_bow_batch = [self.chinese_lda.id2word.doc2bow(chinese_words) for chinese_words in chinese_batch]
@@ -366,60 +373,35 @@ class LDA_LSTM:
 
 		return english_batch, chinese_batch
 
-	def gen_raw_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
-		if file_a == None or file_b == None:
-			self.shuffle()
-			pos_file = self.corpus_path+"pos.txt"
-			neg_file = self.corpus_path+"neg.txt"
-		else:
-			pos_file = self.corpus_path+file_a
-			neg_file = self.corpus_path+file_b
+	def gen_raw_batch(self, file_name):
+		with open(file_name, encoding="utf-8", errors="ignore") as fd:
+			english_batch = []
+			chinese_batch = []
+			while True:
+				score_list = []
+				for _ in range(self.batch_size):
+					english = fd.readline().strip()
+					chinese = fd.readline().strip()
+					score = float(fd.readline().strip())
+					fd.readline()
+					if len(english) == 0 or len(chinese) == 0:
+						return
 
-		pos_num = int(self.batch_size * pos_proportion)
-		neg_num = self.batch_size - pos_num
+					english_batch.append(english)
+					chinese_batch.append(chinese)
+					score_list.append(score)
+				
+				if len(english_batch) != self.batch_size or len(chinese_batch) != self.batch_size:
+					return 
+				if len(score_list) != self.batch_size:
+					return
 
-		batch_num = 0
-		english_batch = []
-		chinese_batch = []
-		
-		with open(pos_file, encoding="utf-8", errors="ignore") as pos_fd:
-			with open(neg_file, encoding="utf-8", errors="ignore") as neg_fd:
-				while True:
-					score_list = []
-					for _ in range(pos_num):
-						english = pos_fd.readline().strip()
-						chinese = pos_fd.readline().strip()
-						pos_fd.readline()
-						if len(english) == 0 or len(chinese) == 0:
-							return
+				yield english_batch, chinese_batch, np.array(score_list, dtype=np.float32)
+				english_batch = []
+				chinese_batch = []
 
-						english_batch.append(english)
-						chinese_batch.append(chinese)
-						score_list.append(1)
-
-					for _ in range(neg_num):
-						english = neg_fd.readline().strip()
-						chinese = neg_fd.readline().strip()
-						neg_fd.readline()
-						if len(english) == 0 or len(chinese) == 0:
-							return
-
-						english_batch.append(english)
-						chinese_batch.append(chinese)
-						score_list.append(0)
-					# saving model
-					if batch_num % self.batch_size == 0:
-						# print(english_batch)
-						# input()
-						# print(chinese_batch)
-						# input()
-						yield english_batch, chinese_batch, np.array(score_list, dtype=np.float32)
-						english_batch = []
-						chinese_batch = []
-						batch_num = 0
-
-	def gen_fea_batch(self, pos_proportion=0.5, file_a=None, file_b=None):
-		for a, b, c in self.gen_raw_batch(pos_proportion=pos_proportion, file_a=file_a, file_b=file_b):
+	def gen_fea_batch(self, file_name):
+		for a, b, c in self.gen_raw_batch(file_name):
 			a_fea, b_fea = self.txt_2_fea_one_hot(a, b)
 			yield a_fea, b_fea, c
 
@@ -454,7 +436,7 @@ class LDA_LSTM:
 		with tf.Session() as sess:
 			saver = tf.train.Saver()
 			saver.restore(sess, self.model_path+"model/model.ckpt")
-			for en_batch, zh_batch, labels in self.gen_raw_batch(file_a="pos_test.txt", file_b="neg_test.txt"):
+			for en_batch, zh_batch, labels in self.gen_raw_batch("train.txt"):
 				en_fea_batch, zh_fea_batch = self.txt_2_fea_one_hot(en_batch, zh_batch)
 				prediction = sess.run([self.prediction], feed_dict={"english_input:0": en_fea_batch, "chinese_input:0": zh_fea_batch})
 				en_writer.update("\n".join(en_batch))

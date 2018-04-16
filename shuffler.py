@@ -14,30 +14,35 @@ class Shuffler:
 		result = []
 		for i in range(num):
 			a = fd.readline()
-			b = fd.readline().strip()
+			b = fd.readline()
+			c = fd.readline().strip()
 			if len(a) == 0 or len(b) == 0:
 				break
-			c = fd.readline()
-			result.append(a+b)
+			d = fd.readline()
+			result.append(a+b+c)
 		return result
 
 	def tmp_file_name(self, file_name, index):
 		return file_name+".tmp_%d" % index
 
 	def shuffle(self, file_name):
-		tmp_file = file_name
+		self.shuffle_mul_file([file_name], file_name)
+
+	def shuffle_mul_file(self, file_name_list, output_file_name):
 		# create buffer writer
 		tmp_writter = []
 		for i in range(self.buffer_file_num):
-			tmp_writter.append(BufferWriter(self.tmp_file_name(file_name, i), max_buffer_size=10*1024*1024, sep="\n\n"))
-		with open(file_name, "r", encoding="utf-8", errors="ignore") as fd:
-			while True:
-				tmp_list = self.read_file(fd, self.tmp_size)
-				for item in tmp_list:
-					index = randint(0, self.buffer_file_num-1)
-					tmp_writter[index].update(item)
-				if len(tmp_list) != self.tmp_size:
-					break
+			tmp_writter.append(BufferWriter(self.tmp_file_name(output_file_name, i), max_buffer_size=50*1024*1024, sep="\n\n"))
+
+		for file_name in file_name_list:
+			with open(file_name, "r", encoding="utf-8", errors="ignore") as fd:
+				while True:
+					tmp_list = self.read_file(fd, self.tmp_size)
+					for item in tmp_list:
+						index = randint(0, self.buffer_file_num-1)
+						tmp_writter[index].update(item)
+					if len(tmp_list) != self.tmp_size:
+						break
 
 		# close buffer writter
 		for i in range(self.buffer_file_num):
@@ -45,9 +50,9 @@ class Shuffler:
 
 		order = list(range(0, self.buffer_file_num))
 		shuffle(order)
-		result_writter = BufferWriter(file_name, max_buffer_size=10*1024*1024, sep="\n\n")
+		result_writter = BufferWriter(output_file_name, max_buffer_size=100*1024*1024, sep="\n\n")
 		for index in order:
-			tmp_file_name = self.tmp_file_name(file_name, index)
+			tmp_file_name = self.tmp_file_name(output_file_name, index)
 			with open(tmp_file_name, "r", encoding="utf-8", errors="ignore") as fd:
 				while True:
 					items = self.read_file(fd, self.tmp_size)
