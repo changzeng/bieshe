@@ -3,7 +3,7 @@
 import os
 import thulac
 import argparse
-from random import randint
+from random import randint, shuffle
 from sys import getsizeof
 
 
@@ -127,13 +127,13 @@ class Generator(object):
     def fetch(self, _list, _index):
         return [_list[item] for item in _index]
 
-    def make_str(self, en_lines, zh_lines):
+    def make_str(self, en_lines, zh_lines, score):
         en_lines = [item.strip() for item in en_lines]
         zh_lines = [item.strip() for item in zh_lines]
         en_txt = " ".join(en_lines)
         zh_txt = " ".join(zh_lines)
 
-        item_txt = en_txt + "\n" + zh_txt
+        item_txt = en_txt + "\n" + zh_txt + "\n" + str(score)
 
         return item_txt
 
@@ -151,7 +151,7 @@ class Generator(object):
                 _range = list(range(start_line, end_line))
                 en_lines = self.fetch(self.en_lines, _range)
                 zh_lines = self.fetch(self.zh_lines, _range)
-                yield self.make_str(en_lines, zh_lines)
+                yield self.make_str(en_lines, zh_lines, 1.0)
 
     def continue_pos_samples(self, num=100, file_name="pos.txt"):
         self.father_func(self.continue_pos_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
@@ -163,7 +163,7 @@ class Generator(object):
                 rand_line_list = self.random((0, max_line-1), line_num)
                 en_lines = self.fetch(self.en_lines, rand_line_list)
                 zh_lines = self.fetch(self.zh_lines, rand_line_list)
-                yield self.make_str(en_lines, zh_lines)
+                yield self.make_str(en_lines, zh_lines, 1.0)
 
     def discrete_pos_samples(self, num=100, file_name="pos.txt"):
         self.father_func(self.discrete_pos_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
@@ -177,7 +177,7 @@ class Generator(object):
                 for _ in range(self.neg_num):
                     line_num_list = self.random((0, max_line-1), line_num, set(range(start_line, end_line)))
                     zh_lines = self.fetch(self.zh_lines, line_num_list)
-                    yield self.make_str(en_lines, zh_lines)
+                    yield self.make_str(en_lines, zh_lines, 0.0)
 
     def continue_neg_samples(self, num=100, file_name="neg.txt"):
         self.father_func(self.continue_neg_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
@@ -190,11 +190,32 @@ class Generator(object):
                 zh_line_list = self.random((0, max_line-1), line_num, set(en_line_list))
                 en_lines = self.fetch(self.en_lines, en_line_list)
                 zh_lines = self.fetch(self.zh_lines, zh_line_list)
-                yield self.make_str(en_lines, zh_lines)
+                yield self.make_str(en_lines, zh_lines, 0.0)
 
     def discrete_neg_samples(self, num=100, file_name="neg.txt"):
         self.father_func(self.discrete_neg_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
-        
+
+    def shuffle(self, _list):
+        shuffle(_list)
+        return _list
+
+    def continue_mix_samples_func(self):
+        for line_num in range(self.min_line_num, self.max_line_num):
+            max_line = int(len(self.en_lines)/line_num) * line_num
+            for start_line in range(0, max_line, line_num):
+                end_line = start_line + line_num
+                en_lines = self.en_lines[start_line: end_line]
+                same_line = self.shuffle(list(range(start_line, end_line)))[:randint(0, line_num)]
+                diff_line = self.random((0, max_line-1), line_num-len(same_line), block_list=set(range(start_line, end_line)))
+                
+                en = self.fetch(self.en_lines, range(start_line, end_line))
+                zh = self.fetch(self.zh_lines, same_line) + self.fetch(self.zh_lines, diff_line)
+
+                yield self.make_str(en, zh, len(same_line) * 1.0 / line_num)
+
+    def continue_mix_samples(self, num=100, file_name="mix.txt"):
+        self.father_func(self.continue_mix_samples_func, num=num, file_name="corpus/avaliable/"+file_name)
+
     def father_func(self, func, args=None, num=100, file_name="output.txt"):
         corpus = []
         corpus_size = 0
@@ -220,6 +241,7 @@ class Generator(object):
         self.discrete_pos_samples(gen_num)
         self.continue_neg_samples(gen_num)
         self.discrete_neg_samples(gen_num)
+        self.continue_mix_samples(gen_num)
 
     def gen_test_dataset(self, gen_num):
         print("generating test dataset...")
@@ -229,6 +251,7 @@ class Generator(object):
         self.discrete_pos_samples(gen_num, file_name="pos_test.txt")
         self.continue_neg_samples(gen_num, file_name="neg_test.txt")
         self.discrete_neg_samples(gen_num, file_name="neg_test.txt")
+        self.continue_mix_samples(gen_num, file_name="mix_test.txt")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='corpus generation.')
