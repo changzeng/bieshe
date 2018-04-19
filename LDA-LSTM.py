@@ -384,10 +384,10 @@ class LDA_LSTM:
 				for _ in range(self.batch_size):
 					english = fd.readline().strip()
 					chinese = fd.readline().strip()
-					score = float(fd.readline().strip())
-					fd.readline()
 					if len(english) == 0 or len(chinese) == 0:
 						return
+					score = float(fd.readline().strip())
+					fd.readline()
 
 					english_batch.append(english)
 					chinese_batch.append(chinese)
