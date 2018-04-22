@@ -3,7 +3,8 @@
 import os
 import argparse
 from random import randint, shuffle
-from buffer_writer import BufferWriter
+from BufferWriter import BufferWriter
+
 
 class Shuffler:
 	def __init__(self, tmp_size=5000, buffer_file_num=10):

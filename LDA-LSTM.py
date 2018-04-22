@@ -10,7 +10,7 @@ import tensorflow as tf
 from random import shuffle
 from tensorflow.contrib.rnn import BasicLSTMCell
 from tensorflow.contrib.seq2seq import sequence_loss
-from buffer_writer import BufferWriter
+from BufferWriter import BufferWriter
 from shuffler import Shuffler
 
 
@@ -74,7 +74,7 @@ class LDA:
 				txt = fd.read()
 				docs = txt.split("\n\n")[:-1]
 				corpus += map(lambda x:x.split("\n")[:2], docs)
-		
+
 		english, chinese = zip(*corpus)
 		english = [sentence.strip() for sentence in english]
 		chinese = [sentence.strip() for sentence in chinese]
@@ -142,7 +142,8 @@ class LDA:
 
 
 class LDA_LSTM:
-	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=False, fea_dim=20, train_epoch_num=10):
+	def __init__(self, batch_size=50, topic_num=30, hidden_size=100, corpus_path="corpus/avaliable", debug=False, fea_dim=20, train_epoch_num=10, processor="gpu"):
+		self.processor = processor
 		self.train_epoch_num = train_epoch_num
 		self.fea_dim = fea_dim
 		self.batch_size = batch_size
@@ -150,8 +151,8 @@ class LDA_LSTM:
 		self.hidden_size = hidden_size
 		self.corpus_path = modify_path(corpus_path)
 		self.save_step = 60
-		self.thu = thulac.thulac(seg_only=True)
 		self.model_path = "./model/LSTM/topic_num(%d)-hidden_size(%d)-batch_size(%d)-fead_dim(%d)/" % (self.topic_num, self.hidden_size, self.batch_size, self.fea_dim)
+		self.model_data_path = self.model_path + "data/"
 		self.model_save_path = self.model_path + "model/"
 		self.summary_save_path = self.model_path + "summary/"
 
@@ -160,14 +161,13 @@ class LDA_LSTM:
 				shutil.rmtree(self.model_path)
 
 		# creat directory
-		for _dir in [self.model_path, self.model_save_path, self.summary_save_path]:
+		for _dir in [self.model_path, self.model_data_path, self.model_save_path, self.summary_save_path]:
 			if not os.path.exists(_dir):
 				os.mkdir(_dir)
 
 		self.logger = get_logger("LSTM")
 		self.shuffler = Shuffler()
 
-		self.load_stopwords()
 		self.load_lda()
 		self.build_graph()
 		self.saver = tf.train.Saver()
@@ -175,7 +175,7 @@ class LDA_LSTM:
 	def shuffle(self, input_file_list, output_file):
 		self.logger.info("start shuffle")
 
-		self.shuffler.shuffle_mul_file([self.corpus_path+_file for _file in input_file_list], self.corpus_path+output_file)
+		self.shuffler.shuffle_mul_file([self.corpus_path+_file for _file in input_file_list], self.model_data_path+output_file)
 
 		self.logger.info("shuffle Done!")
 
@@ -185,12 +185,11 @@ class LDA_LSTM:
 	def shuffle_test_data(self):
 		self.shuffle(["mix_test.txt", "neg_test.txt", "pos_test.txt"], "test.txt")
 
-
 	def build_graph(self):
 		self.logger.info("start building graph")
 		english_input = tf.placeholder(tf.int32, [self.batch_size, self.topic_num], name="english_input")
 		chinese_input = tf.placeholder(tf.int32, [self.batch_size, self.topic_num], name="chinese_input")
-		
+
 		Y = tf.placeholder(tf.float32, [self.batch_size], name="scores")
 
 		# embedding layer
@@ -248,17 +247,18 @@ class LDA_LSTM:
 		y = 1 - (tf.acos((numerator / denominator)) / tf.constant(3.141592653))
 		# Euclidean distance
 		# y = tf.exp(-tf.sqrt(tf.reduce_sum(tf.square(lstm_a_output - lstm_b_output), 1)))
-		
+
 		# reshape y
 		y = tf.reshape(y, [self.batch_size])
 
-		self.global_step = tf.Variable(0, trainable=False)  
-		self.learning_rate = tf.train.exponential_decay(0.1, self.global_step, 10, 2, staircase=False)  
+		self.global_step = tf.Variable(0, trainable=False)
+		self.learning_rate = tf.train.exponential_decay(0.1, self.global_step, 10, 2, staircase=False)
 		self.loss_op = tf.reduce_mean(tf.square(y - Y))
 		self.train_op = tf.train.AdamOptimizer(learning_rate=0.1).minimize(self.loss_op, global_step=self.global_step)
 
 		tf.summary.scalar("loss", self.loss_op)
 		tf.summary.histogram("prediction", y)
+		tf.summary.histogram("labels", Y)
 
 		self.prediction = y
 
@@ -266,7 +266,7 @@ class LDA_LSTM:
 
 		# 导出图
 		# print("exporting meta graph......")
-		# tf.train.export_meta_graph(filename=self.model_path+"model.ckpt.meta") 
+		# tf.train.export_meta_graph(filename=self.model_path+"model.ckpt.meta")
 
 		self.logger.info("Done! building graph")
 
@@ -281,6 +281,11 @@ class LDA_LSTM:
 		return {"english_input:0": english_batch, "chinese_input:0": chinese_batch, "scores:0": scores}
 
 	def train(self):
+		if self.processor == "gpu":
+			print("using gpu...")
+		elif self.processor == "cpu":
+			print("using cpu...")
+			os.environ['CUDA_VISIBLE_DEVICES'] = ''
 		with tf.Session() as sess:
 			self.logger.info("start initialization...")
 			sess.run(self.init)
@@ -291,7 +296,7 @@ class LDA_LSTM:
 			self.logger.info("Done! create summary <FileWriter>")
 			for train_epoch in range(1, self.train_epoch_num+1):
 				self.shuffle_train_data()
-				fea_batches = self.gen_fea_batch(self.corpus_path + "train.txt")
+				fea_batches = self.gen_fea_batch(self.model_data_path + "train.txt")
 				for english_batch, chinese_batch, labels in fea_batches:
 					feed_dict = self.gen_feed_dict(english_batch, chinese_batch, labels)
 					loss, _, summary, prediction, global_step = sess.run([self.loss_op, self.train_op, merged, self.prediction, self.global_step], feed_dict=feed_dict)
@@ -306,7 +311,7 @@ class LDA_LSTM:
 	def txt_2_fea_soft_hot(self, english_batch, chinese_batch):
 		english_batch = [english.split() for english in english_batch]
 		chinese_batch = [chinese.split() for chinese in chinese_batch]
-		
+
 		english_bow_batch = [self.english_lda.id2word.doc2bow(english_words) for english_words in english_batch]
 		chinese_bow_batch = [self.chinese_lda.id2word.doc2bow(chinese_words) for chinese_words in chinese_batch]
 
@@ -340,7 +345,7 @@ class LDA_LSTM:
 	def txt_2_fea_one_hot(self, english_batch, chinese_batch):
 		english_batch = [[word for word in english.split() if len(word.strip()) > 0] for english in english_batch]
 		chinese_batch = [[word for word in chinese.split() if len(word.strip()) > 0] for chinese in chinese_batch]
-		
+
 		english_bow_batch = [self.english_lda.id2word.doc2bow(english_words) for english_words in english_batch]
 		chinese_bow_batch = [self.chinese_lda.id2word.doc2bow(chinese_words) for chinese_words in chinese_batch]
 
@@ -392,9 +397,9 @@ class LDA_LSTM:
 					english_batch.append(english)
 					chinese_batch.append(chinese)
 					score_list.append(score)
-				
+
 				if len(english_batch) != self.batch_size or len(chinese_batch) != self.batch_size:
-					return 
+					return
 				if len(score_list) != self.batch_size:
 					return
 
@@ -458,11 +463,12 @@ if __name__ == "__main__":
 	parser.add_argument('--hidden_size', type=int, default=50, help='rnn hidden neuron num')
 	parser.add_argument('--fea_dim', type=int, default=100, help='topic feature dimention num')
 	parser.add_argument('--debug', type=bool, default=False, help='debug mode')
+	parser.add_argument('--processor', type=str, default="gpu", help='specify the processor you want to use')
 	args = parser.parse_args()
-	
+
 	lda = LDA()
 	if "lstm" in args.mode:
-		lda_lstm = LDA_LSTM(topic_num=args.topic_num, batch_size=args.batch_size, hidden_size=args.hidden_size, fea_dim=args.fea_dim, debug=args.debug)
+		lda_lstm = LDA_LSTM(topic_num=args.topic_num, batch_size=args.batch_size, hidden_size=args.hidden_size, fea_dim=args.fea_dim, debug=args.debug, processor=args.processor)
 	if args.mode == "train_lda":
 		lda.prepare_train()
 		if args.topic_num is not None:

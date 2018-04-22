@@ -1,0 +1,3 @@
+gensim
+tensorflow_gpu==1.5
+thulac
